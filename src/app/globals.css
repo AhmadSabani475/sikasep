@@ -1,0 +1,311 @@
+@import "tailwindcss";
+
+/* ===== Sikasep Design System ===== */
+
+@theme inline {
+  /* Primary: Teal-green — fresh, productive, trustworthy */
+  --color-primary-50: #edfcf5;
+  --color-primary-100: #d4f7e6;
+  --color-primary-200: #aceed1;
+  --color-primary-300: #76dfb6;
+  --color-primary-400: #3ec996;
+  --color-primary-500: #1aad7c;
+  --color-primary-600: #0e8c64;
+  --color-primary-700: #0b7053;
+  --color-primary-800: #0b5943;
+  --color-primary-900: #0a4937;
+
+  /* Accent: Amber — energy, warmth, UMKM vibe */
+  --color-accent-50: #fffbeb;
+  --color-accent-100: #fef3c7;
+  --color-accent-200: #fde68a;
+  --color-accent-300: #fcd34d;
+  --color-accent-400: #fbbf24;
+  --color-accent-500: #f59e0b;
+  --color-accent-600: #d97706;
+
+  /* Surface colors — dark theme */
+  --color-surface-900: #0c0f14;
+  --color-surface-800: #131720;
+  --color-surface-700: #1a1f2e;
+  --color-surface-600: #242a3b;
+  --color-surface-500: #2e3548;
+
+  /* Text */
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+
+  /* Danger */
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+
+  /* Fonts */
+  --font-sans: 'Inter', var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+}
+
+/* ===== Base Styles ===== */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-600) transparent;
+}
+
+body {
+  background: var(--color-surface-900);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===== Custom Scrollbar (Webkit) ===== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-600);
+  border-radius: 999px;
+}
+
+/* ===== Animations ===== */
+@keyframes mic-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(26, 173, 124, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 20px rgba(26, 173, 124, 0);
+  }
+}
+
+@keyframes mic-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-mic-pulse {
+  animation: mic-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-mic-ring {
+  animation: mic-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.5s ease-out forwards;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-700) 25%,
+    var(--color-surface-600) 50%,
+    var(--color-surface-700) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* ===== Glass Effect ===== */
+.glass {
+  background: rgba(19, 23, 32, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-light {
+  background: rgba(26, 31, 46, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/* ===== Gradient Utilities ===== */
+.gradient-primary {
+  background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
+}
+
+.gradient-accent {
+  background: linear-gradient(135deg, var(--color-accent-400), var(--color-accent-500));
+}
+
+.gradient-hero {
+  background: linear-gradient(
+    135deg,
+    var(--color-surface-900) 0%,
+    var(--color-surface-800) 50%,
+    rgba(26, 173, 124, 0.08) 100%
+  );
+}
+
+.gradient-card {
+  background: linear-gradient(
+    145deg,
+    var(--color-surface-800) 0%,
+    var(--color-surface-700) 100%
+  );
+}
+
+/* ===== Glow Effects ===== */
+.glow-primary {
+  box-shadow: 0 0 24px rgba(26, 173, 124, 0.2), 0 0 48px rgba(26, 173, 124, 0.1);
+}
+
+.glow-accent {
+  box-shadow: 0 0 24px rgba(251, 191, 36, 0.2), 0 0 48px rgba(251, 191, 36, 0.1);
+}
+
+/* ===== Focus styles ===== */
+.focus-ring {
+  outline: none;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--color-primary-400);
+  outline-offset: 2px;
+}
+
+/* ===== Toast Animation ===== */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ===== Success Animation ===== */
+@keyframes success-ring {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+@keyframes success-particle {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--rotation, 0deg)) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--rotation, 0deg)) translateY(-40px);
+  }
+}
+
+@keyframes draw-check {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ===== Skeleton Loading ===== */
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-700) 25%,
+    var(--color-surface-600) 50%,
+    var(--color-surface-700) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+/* ===== Input Styles ===== */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px var(--color-surface-700) inset;
+  -webkit-text-fill-color: var(--color-text-primary);
+  transition: background-color 5000s ease-in-out 0s;
+}
