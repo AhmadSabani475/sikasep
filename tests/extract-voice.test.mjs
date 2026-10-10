@@ -56,4 +56,37 @@ test('Task 4: Server-Side Rate Limiter & Rule-Based Fallback', async (t) => {
       'Route handler /api/extract harus memiliki fallback parser jika AI tidak tersedia'
     );
   });
+
+  await t.test('parseTranscriptFallback must extract multi-item Sunda dialect accurately', async () => {
+    const { parseTranscriptFallback } = await import('../src/lib/parser.ts');
+    const menuItems = [
+      { nama: 'Sate Maranggi', harga: 25000 },
+      { nama: 'Nasi Goreng Spesial', harga: 15000 },
+      { nama: 'Air Mineral', harga: 4000 },
+      { nama: 'Es Kelapa', harga: 8000 },
+    ];
+
+    // Case 1: Multi-item dengan angka Sunda
+    const res1 = parseTranscriptFallback('nasi goreng dua sareng air mineral hiji', menuItems);
+    assert.equal(res1.items.length, 2);
+    const nasi = res1.items.find((i) => i.nama === 'Nasi Goreng Spesial');
+    const air = res1.items.find((i) => i.nama === 'Air Mineral');
+    assert.ok(nasi, 'Nasi Goreng Spesial harus terdeteksi');
+    assert.equal(nasi.jumlah, 2);
+    assert.ok(air, 'Air Mineral harus terdeteksi');
+    assert.equal(air.jumlah, 1);
+    assert.equal(res1.total, 2 * 15000 + 1 * 4000);
+
+    // Case 2: Regional culinary alias (maranggi tilu, cai herang hiji)
+    const res2 = parseTranscriptFallback('maranggi tilu, cai herang dua', menuItems);
+    assert.equal(res2.items.length, 2);
+    const sate = res2.items.find((i) => i.nama === 'Sate Maranggi');
+    const cai = res2.items.find((i) => i.nama === 'Air Mineral');
+    assert.ok(sate, 'Sate Maranggi harus terdeteksi dari alias maranggi');
+    assert.equal(sate.jumlah, 3);
+    assert.ok(cai, 'Air Mineral harus terdeteksi dari alias cai herang');
+    assert.equal(cai.jumlah, 2);
+    assert.equal(res2.total, 3 * 25000 + 2 * 4000);
+  });
 });
+

@@ -1,10 +1,8 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
+import { parseTranscriptFallback, type MenuItemInput } from '@/lib/parser';
 
-interface MenuItemInput {
-  nama: string;
-  harga: number;
-}
+export { parseTranscriptFallback };
 
 interface ExtractRequest {
   transcript: string;
@@ -46,156 +44,74 @@ function checkRateLimit(ip: string): { allowed: boolean; retryAfter: number } {
 }
 
 // ---------------------------------------------------------------------------
-// Rule-based Fallback Parser (Offline / Dialek Sunda & Indonesia)
-// Digunakan saat API key tidak ada, kuota habis, atau AI offline
-// ---------------------------------------------------------------------------
-const NUMBER_WORDS: Record<string, number> = {
-  hiji: 1,
-  siji: 1,
-  satu: 1,
-  se: 1,
-  seporsi: 1,
-  segelas: 1,
-  sebungkus: 1,
-  dua: 2,
-  loro: 2,
-  sapasang: 2,
-  tilu: 3,
-  tiga: 3,
-  telu: 3,
-  opat: 4,
-  empat: 4,
-  papat: 4,
-  lima: 5,
-  limo: 5,
-  genep: 6,
-  enam: 6,
-  tujuh: 7,
-  pitu: 7,
-  dalapan: 8,
-  delapan: 8,
-  wolu: 8,
-  salapan: 9,
-  sembilan: 9,
-  songo: 9,
-  sapuluh: 10,
-  sepuluh: 10,
-};
-
-export function parseTranscriptFallback(
-  transcript: string,
-  menuItems: MenuItemInput[]
-): {
-  items: Array<{ nama: string; jumlah: number; harga_satuan: number; subtotal: number }>;
-  total: number;
-  item_tidak_dikenal: string[];
-} {
-  const words = transcript.toLowerCase().split(/\s+/);
-  const detectedItems: Array<{ nama: string; jumlah: number; harga_satuan: number; subtotal: number }> = [];
-  const unknownWords: string[] = [];
-
-  for (const item of menuItems) {
-    const itemNameLower = item.nama.toLowerCase();
-    const itemTokens = itemNameLower.split(/\s+/);
-
-    // Cek apakah transkrip memuat sebagian besar token nama menu
-    const matchFound = itemTokens.some((token) =>
-      token.length > 2 && transcript.toLowerCase().includes(token)
-    );
-
-    if (matchFound) {
-      // Cari angka sebelum atau sesudah nama menu
-      let qty = 1;
-      for (let i = 0; i < words.length; i++) {
-        const w = words[i];
-        if (NUMBER_WORDS[w]) {
-          qty = NUMBER_WORDS[w];
-          break;
-        }
-        const num = parseInt(w, 10);
-        if (!isNaN(num) && num > 0 && num < 100) {
-          qty = num;
-          break;
-        }
-      }
-
-      detectedItems.push({
-        nama: item.nama,
-        jumlah: qty,
-        harga_satuan: item.harga,
-        subtotal: qty * item.harga,
-      });
-    }
-  }
-
-  const total = detectedItems.reduce((acc, curr) => acc + curr.subtotal, 0);
-
-  return {
-    items: detectedItems,
-    total,
-    item_tidak_dikenal: unknownWords,
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Route Handler POST /api/extract
 // ---------------------------------------------------------------------------
 export async function POST(request: NextRequest) {
+  // 1. Simpan input request di scope fungsi agar fallback selalu punya data valid
+  let transcript = '';
+  let menuItems: MenuItemInput[] = [];
+
   try {
-    // 1. Pemeriksaan Rate Limit (Batas Pemakaian Server-Side)
-    const clientIp =
-      request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
-      request.headers.get('x-real-ip') ||
-      'anonymous-client';
-
-    const { allowed, retryAfter } = checkRateLimit(clientIp);
-    if (!allowed) {
-      return NextResponse.json(
-        {
-          error: 'Batas pemakaian suara tercapai (Rate Limit exceeded). Silakan tunggu beberapa detik.',
-          retryAfter,
-        },
-        {
-          status: 429,
-          headers: {
-            'Retry-After': String(retryAfter),
-          },
-        }
-      );
-    }
-
-    // 2. Parse Body Request
     const body: ExtractRequest = await request.json();
-    const { transcript, menuItems } = body;
-
-    if (!transcript || !menuItems || !Array.isArray(menuItems)) {
-      return NextResponse.json(
-        { error: 'Missing or invalid transcript or menuItems' },
-        { status: 400 }
-      );
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    // 3. Fallback Parser jika API key tidak tersedia di environment server
-    if (!apiKey) {
-      console.warn('GEMINI_API_KEY tidak terkonfigurasi. Menggunakan parser fallback lokal.');
-      const fallbackResult = parseTranscriptFallback(transcript, menuItems);
-      return NextResponse.json(fallbackResult);
-    }
-
-    // 4. Ekstraksi Menggunakan Google Gemini dengan Toleransi Dialek Sunda Purwakarta
-    const menuListStr = JSON.stringify(
-      menuItems.map((item) => ({ nama: item.nama, harga: item.harga }))
+    transcript = (body.transcript || '').trim();
+    menuItems = Array.isArray(body.menuItems) ? body.menuItems : [];
+  } catch {
+    return NextResponse.json(
+      { error: 'Format JSON permintaan tidak valid' },
+      { status: 400 }
     );
+  }
 
-    const systemPrompt = `Kamu adalah mesin ekstraksi pesanan untuk sistem kasir Sikasep (Purwakarta).
+  if (!transcript) {
+    return NextResponse.json(
+      { error: 'Teks transkrip suara kosong' },
+      { status: 400 }
+    );
+  }
+
+  // 2. Pemeriksaan Rate Limit (Batas Pemakaian Server-Side)
+  const clientIp =
+    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+    request.headers.get('x-real-ip') ||
+    'anonymous-client';
+
+  const { allowed, retryAfter } = checkRateLimit(clientIp);
+  if (!allowed) {
+    return NextResponse.json(
+      {
+        error: 'Batas pemakaian suara tercapai (Rate Limit exceeded). Silakan tunggu beberapa detik.',
+        retryAfter,
+      },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(retryAfter),
+        },
+      }
+    );
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  // 3. Fallback Parser jika API key tidak ada
+  if (!apiKey) {
+    console.warn('GEMINI_API_KEY tidak terkonfigurasi. Menggunakan parser fallback lokal.');
+    const fallbackResult = parseTranscriptFallback(transcript, menuItems);
+    return NextResponse.json(fallbackResult);
+  }
+
+  // 4. Ekstraksi Menggunakan Google Gemini dengan Timeout & Graceful Fallback
+  const menuListStr = JSON.stringify(
+    menuItems.map((item) => ({ nama: item.nama, harga: item.harga }))
+  );
+
+  const systemPrompt = `Kamu adalah mesin ekstraksi pesanan untuk sistem kasir Sikasep (Purwakarta).
 Tugas kamu adalah mengekstrak item, jumlah (kuantitas), dan harga dari teks ucapan kasir/pelanggan.
 
 Daftar menu toko:
 ${menuListStr}
 
-Kembalikan HANYA format JSON valid berikut tanpa teks markdown tambahan:
+Kembalikan HANYA format JSON valid berikut tanpa markdown/teks lain:
 {
   "items": [
     {"nama": "string (sesuaikan persis dengan daftar menu)", "jumlah": number, "harga_satuan": number, "subtotal": number}
@@ -208,15 +124,17 @@ Aturan Penting:
 1. Pahami dialek Sunda Purwakarta dan campuran Indonesia:
    - Angka Sunda: "hiji" = 1, "dua" = 2, "tilu" = 3, "opat" = 4, "lima" = 5, "genep" = 6, "tujuh" = 7, "dalapan" = 8, "salapan" = 9, "sapuluh" = 10.
    - Satuan: "seporsi" / "saporsi" = 1, "segelas" / "sacangkir" = 1, "sapasang" = 2, "sebungkus" = 1.
-   - Kuliner Purwakarta: "maranggi" -> Sate Maranggi, "simping", "peuyeum", "es kalapa" / "es kelapa", "teh haneut", "cai herang" -> Air Mineral.
+   - Kuliner Purwakarta: "maranggi" -> Sate Maranggi, "simping", "peuyeum", "es kalapa" -> Es Kelapa, "cai herang" / "cai" -> Air Mineral.
 2. Harga HARUS diambil persis dari daftar menu toko. JANGAN mengarang harga.
 3. subtotal = jumlah × harga_satuan.
 4. total = jumlah total semua subtotal.
 5. Jika jumlah tidak disebutkan eksplisit, gunakan 1.`;
 
+  try {
     const ai = new GoogleGenAI({ apiKey });
 
-    const response = await ai.models.generateContent({
+    // Gunakan timeout 2500ms agar transaksi kasir tidak pernah menggantung lama
+    const aiCall = ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: `Teks ucapan kasir: "${transcript}"`,
       config: {
@@ -225,10 +143,14 @@ Aturan Penting:
       },
     });
 
-    const responseText = response.text;
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('AI request timeout (2500ms)')), 2500)
+    );
+
+    const response = await Promise.race([aiCall, timeoutPromise]);
+    const responseText = response?.text;
 
     if (!responseText) {
-      // Fallback jika respon teks kosong
       const fallbackResult = parseTranscriptFallback(transcript, menuItems);
       return NextResponse.json(fallbackResult);
     }
@@ -237,7 +159,6 @@ Aturan Penting:
     try {
       parsed = JSON.parse(responseText);
     } catch {
-      console.error('Gagal parse JSON dari Gemini, beralih ke fallback:', responseText);
       const fallbackResult = parseTranscriptFallback(transcript, menuItems);
       return NextResponse.json(fallbackResult);
     }
@@ -267,20 +188,10 @@ Aturan Penting:
 
     return NextResponse.json(parsed);
   } catch (error) {
-    console.error('Extract API error:', error);
-    // Graceful fallback jika terjadi network error atau kuota habis
-    try {
-      const body: ExtractRequest = await request.clone().json();
-      if (body.transcript && Array.isArray(body.menuItems)) {
-        const fallbackResult = parseTranscriptFallback(body.transcript, body.menuItems);
-        return NextResponse.json(fallbackResult);
-      }
-    } catch {
-      // Ignore clone error
-    }
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    // Apabila Gemini offline, 404, rate limit, atau timeout:
+    // Aktifkan langsung parser fallback lokal yang handal (Status 200 OK)
+    console.warn('Gemini extraction unavailable or timed out. Mengaktifkan fallback lokal:', error);
+    const fallbackResult = parseTranscriptFallback(transcript, menuItems);
+    return NextResponse.json(fallbackResult);
   }
 }

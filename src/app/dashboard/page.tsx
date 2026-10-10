@@ -150,25 +150,30 @@ export default function KasirPage() {
       setError(null);
 
       try {
+        const targetMenu = menuItems && menuItems.length > 0 ? menuItems : mockMenuItems;
         const res = await fetch('/api/extract', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             transcript: text,
-            menuItems: menuItems.map((m) => ({ nama: m.name, harga: m.price })),
+            menuItems: targetMenu.map((m) => ({ nama: m.name, harga: m.price })),
           }),
         });
 
         if (!res.ok) {
-          throw new Error('Gagal mengekstrak data');
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Gagal mengekstrak data');
         }
 
         const data: ParsedTransactionResult = await res.json();
         data.items = data.items.map((item) => {
-          const matchedMenu = menuItems.find((m) => m.name === item.nama);
+          const matchedMenu = targetMenu.find((m) => m.name.toLowerCase() === item.nama.toLowerCase());
           if (matchedMenu) {
             return {
               ...item,
+              nama: matchedMenu.name,
+              harga_satuan: matchedMenu.price,
+              subtotal: item.jumlah * matchedMenu.price,
               menu_item_id: matchedMenu.id,
             };
           }
