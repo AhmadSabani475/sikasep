@@ -2,7 +2,6 @@ import Sidebar from '@/components/Sidebar';
 import BottomNav from '@/components/BottomNav';
 import AuthProvider from '@/components/AuthProvider';
 import ToastProvider from '@/components/Toast';
-import AIChatWidget from '@/components/AIChatWidget';
 
 export default function DashboardLayout({
   children,
@@ -18,7 +17,6 @@ export default function DashboardLayout({
             {children}
           </main>
           <BottomNav />
-          <AIChatWidget />
         </div>
       </ToastProvider>
     </AuthProvider>

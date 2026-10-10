@@ -295,14 +295,17 @@ export default function KasirPage() {
 
             {/* Quick Settings */}
             <div className="flex items-center gap-3">
-              <label className="text-xs font-semibold text-[#57534E] cursor-pointer flex items-center gap-1.5 select-none">
+              <label className="text-xs font-semibold text-[#57534E] cursor-pointer flex items-center gap-1.5 select-none" title="AI otomatis menyebutkan total pesanan lewat audio kasir">
                 <input
                   type="checkbox"
                   checked={voiceEnabled}
                   onChange={(e) => setVoiceEnabled(e.target.checked)}
                   className="rounded border-[#E7E0D3] text-[#9A3412] focus:ring-[#9A3412]/30"
                 />
-                Suara AI
+                <span className="font-semibold text-[#1C1917]">Suara AI</span>
+                <span className="text-[10px] text-[#78350F] bg-[#FDF6E2] px-2 py-0.5 rounded border border-[#E7E0D3] hidden sm:inline">
+                  Menyebutkan total pesanan
+                </span>
               </label>
             </div>
           </div>
@@ -357,95 +360,105 @@ export default function KasirPage() {
             />
           </div>
 
-          {/* Right: Active Order / Draft Review Card */}
-          <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-4 sticky top-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm md:text-base font-bold text-[#1C1917]">
-                Draf Transaksi
-              </h2>
-              {parsedResult && parsedResult.items.length > 0 && (
-                <button
-                  onClick={handleCancel}
-                  className="text-xs font-semibold text-[#B91C1C] hover:underline"
-                >
-                  Kosongkan
-                </button>
-              )}
-            </div>
-
-            {/* If there is active items in draft */}
-            {parsedResult && parsedResult.items.length > 0 ? (
-              <div className="bg-white rounded-2xl border border-[#E7E0D3] p-4 shadow-sm animate-fade-in">
-                <TransactionCard
-                  items={parsedResult.items}
-                  total={parsedResult.total}
-                  unknownItems={parsedResult.item_tidak_dikenal}
-                  rawTranscript={transcript || undefined}
-                  onSave={handleSave}
-                  onCancel={handleCancel}
-                  onAddUnknownItem={handleAddUnknownItem}
-                />
-              </div>
-            ) : isProcessing ? (
-              <div className="bg-white rounded-2xl border border-[#E7E0D3] p-8 text-center flex flex-col items-center gap-3 animate-fade-in shadow-2xs">
-                <div className="w-14 h-14 rounded-full bg-[#FDF6E2] text-[#9A3412] flex items-center justify-center animate-spin">
-                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                </div>
-                <p className="text-sm font-bold text-[#1C1917]">Memproses ucapan kasir...</p>
-                <p className="text-xs text-[#57534E]">AI sedang merapikan item ke draf pesanan</p>
-                {transcript && (
-                  <div className="bg-[#FFFBEB] rounded-xl px-3.5 py-1.5 border border-[#E7E0D3] mt-2">
-                    <p className="text-xs text-[#78350F] italic">&ldquo;{transcript}&rdquo;</p>
+          {/* Right: Voice Panel & Draft Order Review */}
+          <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-5 sticky top-4">
+            {/* 1. Panel Suara AI Kasir (Judul, Status, Tombol Mic, Mode Ramai sejajar & tidak terpotong) */}
+            <div className="bg-white rounded-2xl border border-[#E7E0D3] p-5 shadow-2xs flex flex-col items-center gap-4">
+              <div className="w-full flex items-center justify-between pb-3 border-b border-[#E7E0D3]">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#FDF6E2] text-[#9A3412] flex items-center justify-center shrink-0">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                      <line x1="12" x2="12" y1="19" y2="22" />
+                    </svg>
                   </div>
-                )}
-              </div>
-            ) : (
-              <div className="bg-white rounded-2xl border border-[#E7E0D3] p-6 text-center flex flex-col items-center justify-center gap-3 shadow-2xs min-h-[220px]">
-                <div className="w-12 h-12 rounded-full bg-[#FDF6E2] text-[#9A3412] flex items-center justify-center">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <circle cx="9" cy="21" r="1" />
-                    <circle cx="20" cy="21" r="1" />
-                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-                  </svg>
+                  <div>
+                    <h3 className="text-sm font-bold text-[#1C1917]">Panel Suara Kasir</h3>
+                    <p className="text-[11px] text-[#57534E]">Bicara pesanan sekaligus (ID/Sunda)</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-bold text-[#1C1917]">Draf Masih Kosong</p>
-                  <p className="text-xs text-[#57534E] mt-1 max-w-xs leading-relaxed">
-                    Sentuh menu di katalog cepat atau ucapkan pesanan lewat mikrofon untuk mulai mencatat.
-                  </p>
-                </div>
-              </div>
-            )}
 
-            {/* Permanent Voice Shortcut Bar / Button in Draft Area */}
-            <div className="bg-white rounded-xl border border-[#E7E0D3] p-4 flex items-center justify-between gap-3 shadow-2xs">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-[#FDF6E2] text-[#9A3412] flex items-center justify-center">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                    <line x1="12" x2="12" y1="19" y2="22" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-[#1C1917]">Input Suara Kasir</p>
-                  <p className="text-[11px] text-[#57534E]">Bicara pesanan sekaligus</p>
-                </div>
+                <span className="text-[10px] font-bold text-[#9A3412] bg-[#FDF6E2] px-2 py-0.5 rounded-full border border-[#E7E0D3]">
+                  AI Voice POS
+                </span>
               </div>
 
-              <div>
+              {/* Status "Tekan untuk bicara", Tombol Mic Besar, dan Mode Ramai */}
+              <div className="w-full flex flex-col items-center justify-center py-1">
                 <MicButton
                   onTranscript={handleTranscript}
                   disabled={isProcessing || isSpeaking}
                 />
               </div>
+            </div>
+
+            {/* 2. Draf Transaksi Card */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm md:text-base font-bold text-[#1C1917]">
+                  Draf Transaksi
+                </h2>
+                {parsedResult && parsedResult.items.length > 0 && (
+                  <button
+                    onClick={handleCancel}
+                    className="text-xs font-semibold text-[#B91C1C] hover:underline cursor-pointer"
+                  >
+                    Kosongkan
+                  </button>
+                )}
+              </div>
+
+              {/* If there is active items in draft */}
+              {parsedResult && parsedResult.items.length > 0 ? (
+                <div className="bg-white rounded-2xl border border-[#E7E0D3] p-4 shadow-sm animate-fade-in">
+                  <TransactionCard
+                    items={parsedResult.items}
+                    total={parsedResult.total}
+                    unknownItems={parsedResult.item_tidak_dikenal}
+                    rawTranscript={transcript || undefined}
+                    onSave={handleSave}
+                    onCancel={handleCancel}
+                    onAddUnknownItem={handleAddUnknownItem}
+                  />
+                </div>
+              ) : isProcessing ? (
+                <div className="bg-white rounded-2xl border border-[#E7E0D3] p-8 text-center flex flex-col items-center gap-3 animate-fade-in shadow-2xs">
+                  <div className="w-14 h-14 rounded-full bg-[#FDF6E2] text-[#9A3412] flex items-center justify-center animate-spin">
+                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-bold text-[#1C1917]">Memproses ucapan kasir...</p>
+                  <p className="text-xs text-[#57534E]">AI sedang merapikan item ke draf pesanan</p>
+                  {transcript && (
+                    <div className="bg-[#FFFBEB] rounded-xl px-3.5 py-1.5 border border-[#E7E0D3] mt-2">
+                      <p className="text-xs text-[#78350F] italic">&ldquo;{transcript}&rdquo;</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-[#E7E0D3] p-6 text-center flex flex-col items-center justify-center gap-3 shadow-2xs min-h-[180px]">
+                  <div className="w-12 h-12 rounded-full bg-[#FDF6E2] text-[#9A3412] flex items-center justify-center">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="9" cy="21" r="1" />
+                      <circle cx="20" cy="21" r="1" />
+                      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-[#1C1917]">Draf Masih Kosong</p>
+                    <p className="text-xs text-[#57534E] mt-1 max-w-xs leading-relaxed">
+                      Sentuh menu di katalog cepat atau ucapkan pesanan lewat mikrofon di atas untuk mulai mencatat.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

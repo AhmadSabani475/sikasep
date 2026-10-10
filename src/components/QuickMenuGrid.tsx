@@ -101,7 +101,7 @@ export function QuickMenuGrid({
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all min-h-[36px] flex items-center justify-center ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all min-h-[48px] flex items-center justify-center cursor-pointer ${
                   isActive
                     ? 'bg-[#9A3412] text-[#FFFBEB] shadow-2xs'
                     : 'bg-white text-[#57534E] border border-[#E7E0D3] hover:bg-[#FDF6E2] hover:text-[#1C1917]'

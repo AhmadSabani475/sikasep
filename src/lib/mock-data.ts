@@ -96,6 +96,14 @@ export const mockMenuItems: MenuItem[] = [
     is_active: true,
     created_at: '2026-07-14T10:00:00Z',
   },
+  {
+    id: 'menu-13',
+    store_id: 'store-1',
+    name: 'Air Mineral',
+    price: 4000,
+    is_active: true,
+    created_at: '2026-07-14T10:00:00Z',
+  },
 ];
 const mockTxItems1: TransactionItem[] = [
   {
