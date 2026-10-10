@@ -5,6 +5,8 @@ import MicButton from '@/components/MicButton';
 import TransactionCard from '@/components/TransactionCard';
 import SuccessAnimation from '@/components/SuccessAnimation';
 import QuickMenuGrid from '@/components/QuickMenuGrid';
+import PaymentModal from '@/components/PaymentModal';
+import ReceiptModal from '@/components/ReceiptModal';
 import { formatRupiah, mockMenuItems } from '@/lib/mock-data';
 import type { ParsedItem, ParsedTransactionResult, MenuItem } from '@/types';
 import { useAuth } from '@/components/AuthProvider';
@@ -30,6 +32,18 @@ export default function KasirPage() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [lastSavedAmount, setLastSavedAmount] = useState('');
 
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [pendingItems, setPendingItems] = useState<ParsedItem[]>([]);
+  const [pendingTotal, setPendingTotal] = useState<number>(0);
+  const [lastPaymentDetails, setLastPaymentDetails] = useState<{
+    method: 'tunai' | 'qris';
+    paidAmount: number;
+    changeAmount: number;
+    transactionId?: string;
+    createdAt?: string;
+  } | null>(null);
+
   useEffect(() => {
     async function loadInitialData() {
       if (store) {
@@ -54,58 +68,70 @@ export default function KasirPage() {
     lastSpeakingTimeRef.current = Date.now();
   }, [isSpeaking]);
 
-  const executeSave = async (items: ParsedItem[], total: number, currentTranscript: string) => {
-    if (!store) {
-      // Demo mode fallback save
-      setSavedCount((c) => c + 1);
-      setLastSavedAmount(formatRupiah(total));
-      setShowSuccess(true);
+  const handleSave = useCallback((items: ParsedItem[], total: number) => {
+    setPendingItems(items);
+    setPendingTotal(total);
+    setIsPaymentModalOpen(true);
+  }, []);
+
+  const handleConfirmPayment = async (details: {
+    method: 'tunai' | 'qris';
+    paidAmount: number;
+    changeAmount: number;
+  }) => {
+    const items = pendingItems;
+    const total = pendingTotal;
+    const currentTranscript = transcript || 'Input manual kasir';
+    let txId = `TRX-${Date.now().toString().slice(-6)}`;
+
+    if (store) {
+      setIsProcessing(true);
+      try {
+        const itemsToSave = items.map((item) => ({
+          menu_item_id: item.menu_item_id || null,
+          item_name: item.nama,
+          quantity: item.jumlah,
+          unit_price: item.harga_satuan,
+          subtotal: item.subtotal,
+        }));
+
+        const tx = await createTransaction(store.id, currentTranscript, total, itemsToSave);
+        if (tx) {
+          txId = tx.id ? tx.id.slice(0, 8).toUpperCase() : txId;
+          const stats = await getTodayTotal(store.id);
+          setTodayTotal(stats.total);
+          setTodayCount(stats.count);
+        }
+      } catch (err) {
+        console.error('Error saving transaction:', err);
+      } finally {
+        setIsProcessing(false);
+      }
+    } else {
       setTodayTotal((prev) => prev + total);
       setTodayCount((prev) => prev + 1);
-      setParsedResult(null);
-      setTranscript(null);
-      toast.success('Transaksi demo berhasil disimpan!');
-      return;
     }
 
-    setIsProcessing(true);
+    setSavedCount((c) => c + 1);
+    setLastSavedAmount(formatRupiah(total));
+    setLastPaymentDetails({
+      ...details,
+      transactionId: txId,
+      createdAt: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
+    });
 
-    const itemsToSave = items.map((item) => ({
-      menu_item_id: item.menu_item_id || null,
-      item_name: item.nama,
-      quantity: item.jumlah,
-      unit_price: item.harga_satuan,
-      subtotal: item.subtotal,
-    }));
-
-    const tx = await createTransaction(store.id, currentTranscript, total, itemsToSave);
-
-    if (tx) {
-      setSavedCount((c) => c + 1);
-      setLastSavedAmount(formatRupiah(total));
-      setShowSuccess(true);
-      const stats = await getTodayTotal(store.id);
-      setTodayTotal(stats.total);
-      setTodayCount(stats.count);
-
-      setParsedResult(null);
-      setTranscript(null);
-
-      toast.success('Transaksi berhasil disimpan!');
-    } else {
-      toast.error('Gagal menyimpan transaksi. Coba lagi.');
-    }
-
-    setIsProcessing(false);
+    setIsPaymentModalOpen(false);
+    setIsReceiptModalOpen(true);
+    toast.success('Pembayaran berhasil diproses!');
   };
 
-  const handleSave = useCallback(
-    async (items: ParsedItem[], total: number) => {
-      await executeSave(items, total, transcript || 'Input manual kasir');
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [store, transcript]
-  );
+  const handleNewOrder = useCallback(() => {
+    setParsedResult(null);
+    setTranscript(null);
+    setPendingItems([]);
+    setPendingTotal(0);
+    setIsReceiptModalOpen(false);
+  }, []);
 
   const handleTranscript = useCallback(
     async (text: string) => {
@@ -152,10 +178,9 @@ export default function KasirPage() {
         setParsedResult(data);
 
         if (voiceEnabled && 'speechSynthesis' in window) {
-          const isAutoSaved = autoSave && data.item_tidak_dikenal.length === 0;
           const textMsg =
             data.items.map((i) => `${i.jumlah} ${i.nama}`).join(', ') +
-            `. Total ${data.total} rupiah.${isAutoSaved ? ' Berhasil disimpan.' : ''}`;
+            `. Total ${data.total} rupiah. Draf pesanan siap ditinjau.`;
           const utterance = new SpeechSynthesisUtterance(textMsg);
           utterance.lang = 'id-ID';
 
@@ -167,11 +192,8 @@ export default function KasirPage() {
           window.speechSynthesis.speak(utterance);
         }
 
-        if (autoSave && data.item_tidak_dikenal.length === 0) {
-          await executeSave(data.items, data.total, text);
-        } else {
-          setParsedResult(data);
-        }
+        // Hasil suara selalu masuk ke draf pesanan untuk konfirmasi tap sebelum bayar
+        setParsedResult(data);
       } catch (err) {
         console.error(err);
         setError('Terjadi kesalahan saat memproses suara dengan AI.');
@@ -479,6 +501,28 @@ export default function KasirPage() {
           </div>
         </div>
       </div>
+
+      {/* Task 7: Modal Konfirmasi Pembayaran Kasir */}
+      <PaymentModal
+        isOpen={isPaymentModalOpen}
+        items={pendingItems}
+        total={pendingTotal}
+        onClose={() => setIsPaymentModalOpen(false)}
+        onConfirmPayment={handleConfirmPayment}
+      />
+
+      {/* Task 7: Modal Struk Kasir Thermal Plered */}
+      {lastPaymentDetails && (
+        <ReceiptModal
+          isOpen={isReceiptModalOpen}
+          storeName={store?.name || 'Warung Sikasep Purwakarta'}
+          items={pendingItems}
+          total={pendingTotal}
+          paymentDetails={lastPaymentDetails}
+          onNewOrder={handleNewOrder}
+          onClose={() => setIsReceiptModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

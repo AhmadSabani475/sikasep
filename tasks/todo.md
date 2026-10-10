@@ -150,15 +150,16 @@
 **Description:** Membangun dialog pembayaran kasir (metode Tunai dengan kalkulator uang kembalian instan atau simulasi QRIS) serta pratinjau cetak struk kasir thermal dengan header khas Sikasep Purwakarta.
 
 **Acceptance criteria:**
-- [ ] Transaksi hanya disimpan ke Supabase setelah kasir menekan tombol "Konfirmasi Transaksi".
-- [ ] Modal pembayaran menyediakan tombol cepat uang pas / pecahan Rp50.000, Rp100.000 dan menghitung kembalian akurat.
-- [ ] Setelah pembayaran selesai, muncul pratinjau struk thermal rapi dengan opsi cetak / bagikan dan tombol pesanan baru.
+- [x] Transaksi hanya disimpan ke Supabase setelah kasir menekan tombol "Konfirmasi Transaksi".
+- [x] Modal pembayaran menyediakan tombol cepat uang pas / pecahan Rp50.000, Rp100.000 dan menghitung kembalian akurat.
+- [x] Setelah pembayaran selesai, muncul pratinjau struk thermal rapi dengan opsi cetak / bagikan dan tombol pesanan baru.
 
 **Dependencies:** Task 5, Task 6  
-**Files likely touched:**
-- `src/components/ConfirmPaymentModal.tsx`
+**Files touched:**
+- `src/components/PaymentModal.tsx`
 - `src/components/ReceiptModal.tsx`
 - `src/app/dashboard/page.tsx`
+- `tests/payment-and-receipt.test.mjs`
 
 ---
 
