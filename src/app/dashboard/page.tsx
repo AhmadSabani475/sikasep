@@ -219,6 +219,21 @@ export default function KasirPage() {
     });
   }, []);
 
+  const handleItemsChange = useCallback((newItems: ParsedItem[]) => {
+    setParsedResult((prev) => {
+      if (!prev) return null;
+      if (newItems.length === 0) {
+        return null;
+      }
+      const total = newItems.reduce((acc, curr) => acc + curr.subtotal, 0);
+      return {
+        ...prev,
+        items: newItems,
+        total,
+      };
+    });
+  }, []);
+
   const handleAddUnknownItem = useCallback(
     async (itemName: string, price: number) => {
       if (!store) return;
@@ -420,6 +435,7 @@ export default function KasirPage() {
                     onSave={handleSave}
                     onCancel={handleCancel}
                     onAddUnknownItem={handleAddUnknownItem}
+                    onItemsChange={handleItemsChange}
                   />
                 </div>
               ) : isProcessing ? (

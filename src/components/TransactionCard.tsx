@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { ParsedItem } from '@/types';
 import { formatRupiah } from '@/lib/mock-data';
 
@@ -12,6 +12,7 @@ interface TransactionCardProps {
   onSave: (items: ParsedItem[], total: number) => void;
   onCancel: () => void;
   onAddUnknownItem?: (itemName: string, price: number) => Promise<void>;
+  onItemsChange?: (items: ParsedItem[]) => void;
 }
 
 export default function TransactionCard({
@@ -22,53 +23,75 @@ export default function TransactionCard({
   onSave,
   onCancel,
   onAddUnknownItem,
+  onItemsChange,
 }: TransactionCardProps) {
   const [items, setItems] = useState<ParsedItem[]>(initialItems);
   const [addingItem, setAddingItem] = useState<string | null>(null);
 
+  // Sync internal items whenever initialItems changes from parent (e.g. QuickMenuGrid tap)
+  useEffect(() => {
+    setItems(initialItems);
+  }, [initialItems]);
+
   const calculatedTotal = items.reduce((sum, item) => sum + item.subtotal, 0);
 
-  const updateItem = useCallback((index: number, field: keyof ParsedItem, value: string | number) => {
-    setItems((prev) => {
-      const updated = [...prev];
-      const item = { ...updated[index] };
+  const updateItem = useCallback(
+    (index: number, field: keyof ParsedItem, value: string | number) => {
+      setItems((prev) => {
+        const updated = [...prev];
+        const item = { ...updated[index] };
 
-      if (field === 'jumlah') {
-        const qty = Math.max(1, Number(value));
-        item.jumlah = qty;
-        item.subtotal = qty * item.harga_satuan;
-      } else if (field === 'harga_satuan') {
-        const price = Math.max(0, Number(value));
-        item.harga_satuan = price;
-        item.subtotal = item.jumlah * price;
-      } else if (field === 'nama') {
-        item.nama = String(value);
-      }
+        if (field === 'jumlah') {
+          const qty = Math.max(1, Number(value));
+          item.jumlah = qty;
+          item.subtotal = qty * item.harga_satuan;
+        } else if (field === 'harga_satuan') {
+          const price = Math.max(0, Number(value));
+          item.harga_satuan = price;
+          item.subtotal = item.jumlah * price;
+        } else if (field === 'nama') {
+          item.nama = String(value);
+        }
 
-      updated[index] = item;
-      return updated;
-    });
-  }, []);
+        updated[index] = item;
+        onItemsChange?.(updated);
+        return updated;
+      });
+    },
+    [onItemsChange]
+  );
 
-  const removeItem = useCallback((index: number) => {
-    setItems((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+  const removeItem = useCallback(
+    (index: number) => {
+      setItems((prev) => {
+        const updated = prev.filter((_, i) => i !== index);
+        onItemsChange?.(updated);
+        return updated;
+      });
+    },
+    [onItemsChange]
+  );
 
   const addItem = useCallback(() => {
-    setItems((prev) => [
-      ...prev,
-      {
-        nama: '',
-        jumlah: 1,
-        harga_satuan: 0,
-        subtotal: 0,
-        is_custom: true,
-      },
-    ]);
-  }, []);
+    setItems((prev) => {
+      const updated = [
+        ...prev,
+        {
+          nama: '',
+          jumlah: 1,
+          harga_satuan: 0,
+          subtotal: 0,
+          is_custom: true,
+        },
+      ];
+      onItemsChange?.(updated);
+      return updated;
+    });
+  }, [onItemsChange]);
 
   return (
     <div className="bg-white rounded-2xl border border-[#E7E0D3] overflow-hidden shadow-2xs">
+      {/* Header Draf */}
       <div className="px-5 py-4 border-b border-[#E7E0D3] flex items-center justify-between bg-[#FDF6E2]/40">
         <div>
           <h3 className="font-bold text-sm text-[#1C1917]">Konfirmasi Draf Pesanan</h3>
@@ -129,74 +152,102 @@ export default function TransactionCard({
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs text-[#57534E] border-b border-[#E7E0D3] bg-[#FDF6E2]/20">
-              <th className="text-left px-5 py-3 font-semibold">Item</th>
-              <th className="text-center px-3 py-3 font-semibold w-20">Qty</th>
-              <th className="text-right px-3 py-3 font-semibold w-28">Harga</th>
-              <th className="text-right px-3 py-3 font-semibold w-28">Subtotal</th>
-              <th className="w-12 px-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item, index) => (
-              <tr key={index} className="border-b border-[#E7E0D3]/60 hover:bg-[#FDF6E2]/30 transition-colors">
-                <td className="px-5 py-3">
-                  <input
-                    type="text"
-                    value={item.nama}
-                    onChange={(e) => updateItem(index, 'nama', e.target.value)}
-                    className={`bg-transparent text-[#1C1917] text-sm w-full focus:outline-none focus:ring-2 focus:ring-[#9A3412]/20 rounded px-1.5 py-1 border border-transparent focus:border-[#9A3412] ${
-                      item.is_custom ? 'text-[#9A3412] font-semibold' : 'font-medium'
-                    }`}
-                    placeholder="Nama item"
-                  />
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <input
-                    type="number"
-                    value={item.jumlah}
-                    onChange={(e) => updateItem(index, 'jumlah', e.target.value)}
-                    min={1}
-                    className="bg-[#FDF6E2]/50 border border-[#E7E0D3] text-[#1C1917] text-sm text-center w-14 rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#9A3412] focus:bg-white"
-                  />
-                </td>
-                <td className="px-3 py-3 text-right">
-                  <input
-                    type="number"
-                    value={item.harga_satuan}
-                    onChange={(e) => updateItem(index, 'harga_satuan', e.target.value)}
-                    min={0}
-                    className="bg-[#FDF6E2]/50 border border-[#E7E0D3] text-[#1C1917] text-sm text-right w-24 rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#9A3412] focus:bg-white font-mono"
-                  />
-                </td>
-                <td className="px-3 py-3 text-right font-bold text-[#9A3412] tabular-nums">
+      {/* Daftar Item Draf: Kartu Bertumpuk (Nama Penuh di Atas, Qty Stepper, Harga Ribuan, Hapus) */}
+      <div className="p-3 md:p-4 space-y-3 max-h-[420px] overflow-y-auto">
+        {items.map((item, index) => (
+          <div
+            key={item.menu_item_id || index}
+            className="bg-[#FDF6E2]/40 rounded-xl p-3 md:p-3.5 border border-[#E7E0D3] flex flex-col gap-2.5 transition-all shadow-2xs"
+          >
+            {/* 1. Baris Atas: Nama Penuh (Tidak Menciut, Tidak Terpotong) */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <input
+                  type="text"
+                  value={item.nama}
+                  onChange={(e) => updateItem(index, 'nama', e.target.value)}
+                  className={`w-full bg-transparent text-[#1C1917] text-sm md:text-base font-bold focus:outline-none focus:ring-1 focus:ring-[#9A3412]/30 rounded px-1 -mx-1 ${
+                    item.is_custom ? 'text-[#9A3412]' : ''
+                  }`}
+                  placeholder="Nama item"
+                />
+                {item.is_custom && (
+                  <span className="text-[10px] text-[#9A3412] font-semibold bg-[#FEE2E2] px-1.5 py-0.5 rounded border border-[#FCA5A5] inline-block mt-0.5">
+                    Menu Khusus
+                  </span>
+                )}
+              </div>
+
+              {/* Tombol Hapus: min 48px touch target */}
+              <button
+                onClick={() => removeItem(index)}
+                type="button"
+                className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-xl text-[#57534E] hover:text-[#B91C1C] hover:bg-[#FEE2E2] active:scale-95 transition-all flex items-center justify-center shrink-0 cursor-pointer"
+                aria-label={`Hapus ${item.nama}`}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* 2. Baris Bawah: Stepper − dan + (min 48px), Harga Satuan, dan Subtotal Ribuan */}
+            <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-[#E7E0D3]/60">
+              {/* Stepper Qty Ergonomis (min 48px, tanpa spinner bawaan browser) */}
+              <div className="flex items-center gap-1.5 bg-white rounded-xl border border-[#E7E0D3] p-1 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => updateItem(index, 'jumlah', Math.max(1, item.jumlah - 1))}
+                  disabled={item.jumlah <= 1}
+                  className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-lg bg-[#FDF6E2] hover:bg-[#E7E0D3] active:scale-95 text-[#1C1917] text-lg font-bold flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                  aria-label={`Kurangi kuantitas ${item.nama}`}
+                >
+                  −
+                </button>
+                <span className="w-9 text-center font-bold text-sm md:text-base tabular-nums text-[#1C1917]">
+                  {item.jumlah}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => updateItem(index, 'jumlah', item.jumlah + 1)}
+                  className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-lg bg-[#FDF6E2] hover:bg-[#E7E0D3] active:scale-95 text-[#1C1917] text-lg font-bold flex items-center justify-center transition-all cursor-pointer"
+                  aria-label={`Tambah kuantitas ${item.nama}`}
+                >
+                  +
+                </button>
+              </div>
+
+              {/* Rincian Harga Satuan & Subtotal Format Ribuan */}
+              <div className="text-right">
+                <div className="text-[11px] text-[#57534E]">
+                  @ <span className="tabular-nums font-medium">{formatRupiah(item.harga_satuan)}</span>
+                </div>
+                <div className="text-sm md:text-base font-extrabold text-[#9A3412] tabular-nums">
                   {formatRupiah(item.subtotal)}
-                </td>
-                <td className="px-2 py-3">
-                  <button
-                    onClick={() => removeItem(index)}
-                    className="w-10 h-10 rounded-lg text-[#57534E] hover:text-[#B91C1C] hover:bg-[#FEE2E2] transition-all flex items-center justify-center cursor-pointer"
-                    aria-label={`Hapus ${item.nama}`}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
-      <div className="px-5 py-3 border-b border-[#E7E0D3] bg-[#FDF6E2]/10">
+      {/* Tambah Item Manual */}
+      <div className="px-5 py-3 border-t border-[#E7E0D3] bg-[#FDF6E2]/10">
         <button
           onClick={addItem}
-          className="flex items-center gap-2 text-xs text-[#9A3412] hover:text-[#7C2D12] font-bold transition-colors min-h-[36px] cursor-pointer"
+          type="button"
+          className="flex items-center gap-2 text-xs text-[#9A3412] hover:text-[#7C2D12] font-bold transition-colors min-h-[40px] cursor-pointer"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <line x1="12" y1="5" x2="12" y2="19" />
@@ -206,7 +257,8 @@ export default function TransactionCard({
         </button>
       </div>
 
-      <div className="px-5 py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#FDF6E2]/30">
+      {/* Footer Total & Aksi Konfirmasi */}
+      <div className="px-5 py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#FDF6E2]/30 border-t border-[#E7E0D3]">
         <div>
           <p className="text-xs font-semibold text-[#57534E]">Total Pembayaran</p>
           <p className="text-xl font-extrabold text-[#9A3412] tabular-nums">{formatRupiah(calculatedTotal)}</p>
@@ -214,6 +266,7 @@ export default function TransactionCard({
         <div className="flex gap-2">
           <button
             onClick={onCancel}
+            type="button"
             className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl border border-[#E7E0D3] bg-white text-sm font-semibold text-[#57534E] hover:bg-[#FDF6E2] hover:text-[#1C1917] transition-all min-h-[48px] flex items-center justify-center cursor-pointer"
           >
             Batal
@@ -221,6 +274,7 @@ export default function TransactionCard({
           <button
             onClick={() => onSave(items.filter((i) => i.nama.trim()), calculatedTotal)}
             disabled={items.filter((i) => i.nama.trim()).length === 0}
+            type="button"
             className="flex-1 sm:flex-initial px-6 py-2.5 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] active:bg-[#6c2710] text-[#FFFBEB] text-sm font-bold shadow-sm hover:shadow transition-all disabled:opacity-40 disabled:cursor-not-allowed min-h-[48px] flex items-center justify-center cursor-pointer"
           >
             Simpan Transaksi
