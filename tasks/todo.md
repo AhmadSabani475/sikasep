@@ -51,13 +51,17 @@
 
 ---
 
-## Task 3: Quick Menu Grid (Katalog Cepat Item Terlaris) (COMPLETED)
-**Description:** Membangun antarmuka katalog menu cepat untuk kasir yang memuat produk terlaris khas Purwakarta (Sate Maranggi Sapi, Campur Lemak, Es Kelapa Muda, Simping, Colenak, dll.) dengan kartu sentuh besar untuk menambah pesanan instan.
+## Task 3: Quick Menu Grid & Perbaikan Layar Kasir (COMPLETED)
+**Description:** Membangun antarmuka katalog menu cepat untuk kasir yang memuat produk terlaris dengan kartu sentuh besar (target >= 48px), memperbaiki tombol mic besar (kontras >= 3:1), merapikan layout panel suara AI, menghapus widget chat ungu-pink, dan mengoreksi data demo Air Mineral.
 
 **Acceptance criteria:**
-- [x] Menampilkan grid menu terlaris responsif (2 kolom di mobile, 3-4 kolom di desktop).
-- [x] Setiap kartu menampilkan nama item, harga dengan format mata uang `tabular-nums`.
-- [x] Sekali sentuh menambah kuantitas item ke draf keranjang secara *instant/optimistic*.
+- [x] Tombol mic besar menggunakan latar terakota `#9A3412` dan ikon krem `#FFFBEB` (kontras 6.41:1 > 3:1).
+- [x] Panel suara kasir tertata vertikal dan sejajar: judul, status "Tekan untuk bicara", tombol mic besar 88px, dan "Mode Ramai".
+- [x] Widget chat ungu-pink (`AIChatWidget.tsx`) dihapus dari dashboard layout.
+- [x] Seluruh kartu produk dan kategori pill memiliki target sentuh >= 48px (kartu produk min 96px).
+- [x] Harga demo Air Mineral dikoreksi menjadi Rp 4.000 di Supabase DB dan `mock-data.ts`.
+- [x] Keterangan singkat "Mode Ramai" dan "Suara AI" ditambahkan secara jelas.
+- [x] Hasil terverifikasi pada viewport 375px (mobile) dan 1280px (desktop).
 - [x] Filter pencarian dan kategori (Makanan, Minuman, Oleh-oleh) tanpa emoji.
 - [x] Terintegrasi ke halaman kasir utama `src/app/dashboard/page.tsx`.
 
