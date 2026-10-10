@@ -37,20 +37,32 @@ export default function MenuFormModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-xs animate-fade-in"
       onClick={handleBackdropClick}
     >
-      <div className="glass rounded-2xl w-full max-w-md p-6 animate-slide-up" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-base font-semibold">
-            {editItem ? 'Edit Menu' : 'Tambah Menu Baru'}
+      <div
+        className="bg-[#FFFFFF] border border-[#E7E0D3] rounded-2xl w-full max-w-md p-6 shadow-xl animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5 pb-3 border-b border-[#E7E0D3]">
+          <h3 className="text-base font-bold text-[#1C1917]">
+            {editItem ? 'Ubah Data Menu' : 'Tambah Menu Baru'}
           </h3>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/5 transition-all"
+            className="p-2 rounded-lg text-[#78716C] hover:text-[#1C1917] hover:bg-[#FDF6E2] transition-colors"
             aria-label="Tutup"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -59,7 +71,10 @@ export default function MenuFormModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="menu-name" className="block text-sm font-medium text-text-secondary mb-1.5">
+            <label
+              htmlFor="menu-name"
+              className="block text-xs font-semibold uppercase tracking-wider text-[#78716C] mb-1.5"
+            >
               Nama Menu
             </label>
             <input
@@ -67,16 +82,19 @@ export default function MenuFormModal({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Sate Maranggi Spesial"
+              placeholder="Contoh: Sate Maranggi Spesial"
               required
               autoFocus
-              className="w-full px-4 py-3 rounded-xl bg-surface-700 border border-white/5 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all"
+              className="w-full px-4 py-3 rounded-xl bg-[#FFFBEB] border border-[#E7E0D3] text-[#1C1917] placeholder:text-[#A8A29E] text-sm focus:outline-hidden focus:border-[#9A3412] focus:ring-1 focus:ring-[#9A3412] transition-colors"
             />
           </div>
 
           <div>
-            <label htmlFor="menu-price" className="block text-sm font-medium text-text-secondary mb-1.5">
-              Harga (Rp)
+            <label
+              htmlFor="menu-price"
+              className="block text-xs font-semibold uppercase tracking-wider text-[#78716C] mb-1.5"
+            >
+              Harga Satuan (Rp)
             </label>
             <input
               id="menu-price"
@@ -86,21 +104,21 @@ export default function MenuFormModal({
               placeholder="15000"
               required
               min={0}
-              className="w-full px-4 py-3 rounded-xl bg-surface-700 border border-white/5 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all"
+              className="w-full px-4 py-3 rounded-xl bg-[#FFFBEB] border border-[#E7E0D3] text-[#1C1917] placeholder:text-[#A8A29E] text-sm focus:outline-hidden focus:border-[#9A3412] focus:ring-1 focus:ring-[#9A3412] transition-colors tabular-nums"
             />
           </div>
 
-          <div className="flex gap-2 pt-2">
+          <div className="flex gap-3 pt-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 rounded-xl border border-white/10 text-sm font-medium text-text-secondary hover:bg-white/5 transition-all"
+              className="flex-1 min-h-[48px] rounded-xl border border-[#E7E0D3] bg-[#FDF6E2] text-sm font-semibold text-[#57534E] hover:bg-[#E7E0D3] hover:text-[#1C1917] transition-colors cursor-pointer"
             >
               Batal
             </button>
             <button
               type="submit"
-              className="flex-1 py-3 rounded-xl gradient-primary text-white text-sm font-semibold shadow-lg shadow-primary-500/20 hover:shadow-primary-500/40 transition-all"
+              className="flex-1 min-h-[48px] rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] text-[#FFFBEB] text-sm font-semibold shadow-xs hover:shadow-sm active:scale-[0.98] transition-all cursor-pointer"
             >
               {editItem ? 'Simpan Perubahan' : 'Tambah Menu'}
             </button>

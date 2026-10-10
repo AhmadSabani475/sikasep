@@ -72,17 +72,37 @@ const iconMap: Record<string, React.ReactNode> = {
   ),
 };
 
-const tipeStyles: Record<string, { bg: string; border: string; text: string }> = {
-  positive: { bg: 'bg-primary-500/10', border: 'border-primary-500/20', text: 'text-primary-400' },
-  warning: { bg: 'bg-accent-500/10', border: 'border-accent-500/20', text: 'text-accent-400' },
-  suggestion: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400' },
-  info: { bg: 'bg-surface-600/50', border: 'border-white/10', text: 'text-text-secondary' },
+const tipeStyles: Record<string, { bg: string; border: string; text: string; iconBg: string }> = {
+  positive: {
+    bg: 'bg-[#DCFCE7]/40',
+    border: 'border-[#86EFAC]',
+    text: 'text-[#15803D]',
+    iconBg: 'bg-[#DCFCE7] text-[#15803D]',
+  },
+  warning: {
+    bg: 'bg-[#FEF3C7]/40',
+    border: 'border-[#FDE68A]',
+    text: 'text-[#B45309]',
+    iconBg: 'bg-[#FEF3C7] text-[#B45309]',
+  },
+  suggestion: {
+    bg: 'bg-[#FDF6E2]',
+    border: 'border-[#E7E0D3]',
+    text: 'text-[#9A3412]',
+    iconBg: 'bg-[#FFFBEB] text-[#9A3412] border border-[#E7E0D3]',
+  },
+  info: {
+    bg: 'bg-[#F5EBE1]/50',
+    border: 'border-[#E7E0D3]',
+    text: 'text-[#57534E]',
+    iconBg: 'bg-[#FFFFFF] text-[#57534E] border border-[#E7E0D3]',
+  },
 };
 
-const priorityStyles: Record<string, { bg: string; text: string }> = {
-  tinggi: { bg: 'bg-danger-500/15', text: 'text-danger-500' },
-  sedang: { bg: 'bg-accent-500/15', text: 'text-accent-400' },
-  rendah: { bg: 'bg-surface-600', text: 'text-text-secondary' },
+const priorityStyles: Record<string, { bg: string; text: string; border: string }> = {
+  tinggi: { bg: 'bg-[#FEE2E2]', text: 'text-[#B91C1C]', border: 'border-[#FECACA]' },
+  sedang: { bg: 'bg-[#FEF3C7]', text: 'text-[#B45309]', border: 'border-[#FDE68A]' },
+  rendah: { bg: 'bg-[#FDF6E2]', text: 'text-[#57534E]', border: 'border-[#E7E0D3]' },
 };
 
 export default function InsightsPage() {
@@ -121,37 +141,49 @@ export default function InsightsPage() {
       setInsights(result);
     } catch (err) {
       console.error(err);
-      setError('Gagal memuat insights AI. Coba lagi nanti.');
+      setError('Gagal memuat rekomendasi AI. Silakan coba lagi.');
     } finally {
       setAiLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
-      <header className="px-6 py-5 border-b border-white/5">
+    <div className="flex flex-col h-full overflow-y-auto bg-[#FFFBEB] text-[#1C1917]">
+      <header className="px-6 py-5 border-b border-[#E7E0D3] bg-[#FFFBEB]/90 backdrop-blur-xs sticky top-0 z-10">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold flex items-center gap-2">
-              <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs">
-                🧠
+            <h1 className="text-xl font-bold tracking-tight text-[#1C1917] flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-xl bg-[#9A3412] flex items-center justify-center text-[#FFFBEB]">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                </svg>
               </span>
-              AI Insights
+              AI Insights & Rekomendasi
             </h1>
-            <p className="text-xs text-text-muted mt-0.5">Saran bisnis cerdas dari AI berdasarkan data toko Anda</p>
+            <p className="text-xs text-[#78716C] mt-0.5">Saran bisnis cerdas berbasis data toko UMKM Anda</p>
           </div>
           {analytics && (
             <button
               onClick={() => fetchInsights(analytics)}
               disabled={aiLoading}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl glass text-sm text-text-secondary hover:text-primary-400 hover:bg-white/5 transition-all disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl bg-[#FFFFFF] border border-[#E7E0D3] text-sm font-semibold text-[#57534E] hover:text-[#9A3412] hover:bg-[#FDF6E2] shadow-2xs transition-colors disabled:opacity-50 cursor-pointer"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={aiLoading ? 'animate-spin' : ''}>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={aiLoading ? 'animate-spin text-[#9A3412]' : ''}
+              >
                 <polyline points="1 4 1 10 7 10" />
                 <polyline points="23 20 23 14 17 14" />
                 <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
               </svg>
-              Refresh
+              Segarkan
             </button>
           )}
         </div>
@@ -159,107 +191,121 @@ export default function InsightsPage() {
 
       <div className="p-6 space-y-6">
         {(loading || aiLoading) && !insights && (
-          <div className="flex flex-col items-center justify-center py-16 gap-4 animate-fade-in">
-            <div className="relative w-20 h-20">
-              <div className="absolute inset-0 rounded-full border-2 border-primary-500/20 animate-spin" style={{ borderTopColor: 'var(--color-primary-400)' }} />
-              <div className="absolute inset-3 rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
-                <span className="text-2xl">🧠</span>
-              </div>
+          <div className="flex flex-col items-center justify-center py-16 gap-4 animate-fade-in bg-[#FFFFFF] border border-[#E7E0D3] rounded-2xl p-8">
+            <div className="w-12 h-12 rounded-xl bg-[#FDF6E2] border border-[#E7E0D3] flex items-center justify-center text-[#9A3412]">
+              <svg className="w-6 h-6 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-text-primary">AI sedang menganalisis data Anda...</p>
-              <p className="text-xs text-text-muted mt-1">Ini mungkin memakan waktu beberapa detik</p>
+              <p className="text-sm font-bold text-[#1C1917]">AI sedang menganalisis pola penjualan Anda...</p>
+              <p className="text-xs text-[#78716C] mt-1">Menghitung tren omzet, produk terlaris, dan jam sibuk toko</p>
             </div>
           </div>
         )}
+
         {error && (
-          <div className="px-4 py-3 rounded-xl bg-danger-500/10 border border-danger-500/20 text-danger-500 text-sm animate-fade-in text-center">
+          <div className="px-4 py-3 rounded-xl bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm animate-fade-in text-center">
             {error}
             {analytics && (
-              <button onClick={() => fetchInsights(analytics)} className="block mt-2 mx-auto text-xs font-medium hover:underline">
+              <button onClick={() => fetchInsights(analytics)} className="block mt-2 mx-auto text-xs font-bold underline cursor-pointer">
                 Coba Lagi
               </button>
             )}
           </div>
         )}
+
         {analytics && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 animate-fade-in">
-            <div className="glass rounded-2xl p-4">
-              <p className="text-xs text-text-muted">Revenue 30 hari</p>
-              <p className="text-lg font-bold text-primary-400 mt-1">{formatRupiah(analytics.totalRevenue30d)}</p>
+            <div className="bg-[#FFFFFF] border border-[#E7E0D3] rounded-2xl p-4 shadow-2xs">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#78716C]">Revenue 30 Hari</p>
+              <p className="text-lg font-bold text-[#9A3412] mt-1 tabular-nums">{formatRupiah(analytics.totalRevenue30d)}</p>
             </div>
-            <div className="glass rounded-2xl p-4">
-              <p className="text-xs text-text-muted">Total Transaksi</p>
-              <p className="text-lg font-bold text-text-primary mt-1">{analytics.totalTransactions30d}</p>
+            <div className="bg-[#FFFFFF] border border-[#E7E0D3] rounded-2xl p-4 shadow-2xs">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#78716C]">Total Transaksi</p>
+              <p className="text-lg font-bold text-[#1C1917] mt-1 tabular-nums">{analytics.totalTransactions30d}</p>
             </div>
-            <div className="glass rounded-2xl p-4">
-              <p className="text-xs text-text-muted">Rata-rata / Transaksi</p>
-              <p className="text-lg font-bold text-accent-400 mt-1">{formatRupiah(analytics.avgOrderValue)}</p>
+            <div className="bg-[#FFFFFF] border border-[#E7E0D3] rounded-2xl p-4 shadow-2xs">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#78716C]">Rata-rata Order</p>
+              <p className="text-lg font-bold text-[#78350F] mt-1 tabular-nums">{formatRupiah(analytics.avgOrderValue)}</p>
             </div>
-            <div className="glass rounded-2xl p-4">
-              <p className="text-xs text-text-muted">Tren Mingguan</p>
-              <p className={`text-lg font-bold mt-1 ${analytics.weekComparison.changePercent >= 0 ? 'text-primary-400' : 'text-danger-500'}`}>
-                {analytics.weekComparison.changePercent >= 0 ? '+' : ''}{analytics.weekComparison.changePercent}%
+            <div className="bg-[#FFFFFF] border border-[#E7E0D3] rounded-2xl p-4 shadow-2xs">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#78716C]">Tren Mingguan</p>
+              <p
+                className={`text-lg font-bold mt-1 tabular-nums ${
+                  analytics.weekComparison.changePercent >= 0 ? 'text-[#15803D]' : 'text-[#B91C1C]'
+                }`}
+              >
+                {analytics.weekComparison.changePercent >= 0 ? '+' : ''}
+                {analytics.weekComparison.changePercent}%
               </p>
             </div>
           </div>
         )}
+
         {insights && (
           <>
-            <div className="glass rounded-2xl p-5 animate-fade-in">
+            <div className="bg-[#FFFFFF] border border-[#E7E0D3] rounded-2xl p-5 shadow-2xs animate-fade-in">
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-lg">✨</span>
-                <h2 className="text-sm font-semibold">Ringkasan AI</h2>
+                <span className="w-6 h-6 rounded-lg bg-[#FDF6E2] border border-[#E7E0D3] flex items-center justify-center text-[#9A3412]">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+                </span>
+                <h2 className="text-base font-bold text-[#1C1917]">Ringkasan Eksekutif AI</h2>
               </div>
-              <p className="text-sm text-text-secondary leading-relaxed">{insights.ringkasan}</p>
+              <p className="text-sm text-[#57534E] leading-relaxed">{insights.ringkasan}</p>
             </div>
+
             <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary-400">
+              <h2 className="text-base font-bold text-[#1C1917] flex items-center gap-2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#9A3412]">
                   <path d="M9 18h6" /><path d="M10 22h4" />
                   <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14" />
                 </svg>
-                Insights
+                Poin Wawasan Utama
               </h2>
               {insights.insights.map((insight, i) => {
                 const style = tipeStyles[insight.tipe] || tipeStyles.info;
                 return (
                   <div
                     key={i}
-                    className={`rounded-2xl p-4 border ${style.bg} ${style.border} animate-fade-in`}
+                    className={`rounded-2xl p-4.5 border ${style.bg} ${style.border} shadow-2xs animate-fade-in`}
                     style={{ animationDelay: `${i * 0.1}s` }}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className={`shrink-0 w-9 h-9 rounded-xl ${style.bg} flex items-center justify-center ${style.text}`}>
+                    <div className="flex items-start gap-3.5">
+                      <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${style.iconBg}`}>
                         {iconMap[insight.ikon] || iconMap.lightbulb}
                       </div>
                       <div>
-                        <h3 className="text-sm font-semibold text-text-primary">{insight.judul}</h3>
-                        <p className="text-xs text-text-secondary mt-1 leading-relaxed">{insight.deskripsi}</p>
+                        <h3 className="text-sm font-bold text-[#1C1917]">{insight.judul}</h3>
+                        <p className="text-xs text-[#57534E] mt-1 leading-relaxed">{insight.deskripsi}</p>
                       </div>
                     </div>
                   </div>
                 );
               })}
             </div>
+
             {insights.saran_aksi && insights.saran_aksi.length > 0 && (
               <div className="space-y-3">
-                <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent-400">
+                <h2 className="text-base font-bold text-[#1C1917] flex items-center gap-2">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#9A3412]">
                     <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" />
                   </svg>
-                  Saran Aksi
+                  Rekomendasi Tindakan Strategis
                 </h2>
                 {insights.saran_aksi.map((saran, i) => {
                   const pStyle = priorityStyles[saran.prioritas] || priorityStyles.rendah;
                   return (
-                    <div key={i} className="glass rounded-2xl p-4 animate-fade-in" style={{ animationDelay: `${i * 0.1}s` }}>
+                    <div key={i} className="bg-[#FFFFFF] border border-[#E7E0D3] rounded-2xl p-4 shadow-2xs animate-fade-in" style={{ animationDelay: `${i * 0.1}s` }}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-text-primary">{saran.aksi}</p>
-                          <p className="text-xs text-text-muted mt-1">Estimasi dampak: {saran.estimasi_dampak}</p>
+                          <p className="text-sm font-bold text-[#1C1917]">{saran.aksi}</p>
+                          <p className="text-xs text-[#78716C] mt-1">Estimasi dampak: {saran.estimasi_dampak}</p>
                         </div>
-                        <span className={`shrink-0 text-[10px] px-2 py-1 rounded-full font-medium ${pStyle.bg} ${pStyle.text}`}>
+                        <span className={`shrink-0 text-[11px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider border ${pStyle.bg} ${pStyle.text} ${pStyle.border}`}>
                           {saran.prioritas}
                         </span>
                       </div>
@@ -270,13 +316,18 @@ export default function InsightsPage() {
             )}
           </>
         )}
+
         {!loading && !aiLoading && !insights && !error && analytics && analytics.totalTransactions30d === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
-            <div className="w-16 h-16 rounded-2xl glass flex items-center justify-center mb-4">
-              <span className="text-2xl">📊</span>
+          <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in bg-[#FFFFFF] border border-[#E7E0D3] rounded-2xl p-8">
+            <div className="w-14 h-14 rounded-2xl bg-[#FDF6E2] border border-[#E7E0D3] flex items-center justify-center mb-3 text-[#9A3412]">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="20" x2="18" y2="10" />
+                <line x1="12" y1="20" x2="12" y2="4" />
+                <line x1="6" y1="20" x2="6" y2="14" />
+              </svg>
             </div>
-            <p className="text-sm text-text-secondary font-medium">Belum cukup data untuk analisis</p>
-            <p className="text-xs text-text-muted mt-1">Lakukan beberapa transaksi terlebih dahulu agar AI bisa menganalisis pola bisnis Anda</p>
+            <p className="text-base font-bold text-[#1C1917]">Belum cukup data transaksi untuk analisis</p>
+            <p className="text-xs text-[#78716C] mt-1">Lakukan transaksi penjualan terlebih dahulu agar AI dapat mendeteksi pola bisnis toko Anda</p>
           </div>
         )}
       </div>

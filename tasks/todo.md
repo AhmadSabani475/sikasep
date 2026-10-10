@@ -167,14 +167,17 @@
 **Description:** Menyelaraskan seluruh halaman aplikasi lainnya (Login/Auth, Katalog Menu, Riwayat Transaksi, Rekap Penjualan, Sikasep AI) dengan palet Keramik Plered dan motif Rereng Kendi.
 
 **Acceptance criteria:**
-- [ ] Halaman login dan register memiliki kartu hangat dengan tekstur Rereng Kendi subtil.
-- [ ] Halaman Rekap & Riwayat menggunakan warna chart yang selaras dengan palet terakota dan tanah liat (menghapus warna neon).
-- [ ] Seluruh halaman bebas dari emoji sebagai ikon.
+- [x] Halaman login dan register memiliki kartu hangat dengan tekstur Rereng Kendi subtil.
+- [x] Halaman Rekap & Riwayat menggunakan warna chart yang selaras dengan palet terakota dan tanah liat (menghapus warna neon).
+- [x] Seluruh halaman bebas dari emoji sebagai ikon.
 
 **Dependencies:** Task 1–7  
-**Files likely touched:**
+**Files touched:**
 - `src/app/login/page.tsx`
 - `src/app/register/page.tsx`
 - `src/app/dashboard/menu/page.tsx`
+- `src/components/MenuFormModal.tsx`
 - `src/app/dashboard/riwayat/page.tsx`
 - `src/app/dashboard/rekap/page.tsx`
+- `src/app/dashboard/insights/page.tsx`
+- `tests/task8-secondary-pages.test.mjs`
