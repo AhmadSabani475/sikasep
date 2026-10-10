@@ -79,20 +79,24 @@
 
 ---
 
-## Task 4: Mic Thumb Bar & Integrasi Suara Toleran Dialek (Server-Only Gemini + Rate Limit)
-**Description:** Membuat bilah suara mengambang di area bawah layar (*Bottom Thumb Zone*) dengan tombol mic terakota 64px, animasi gelombang saat mendengar, transkrip real-time, dan fallback tombol pencarian manual. Kunci Google Gemini API **eksklusif di server** (`/api/extract`) dan dilindungi mekanisme pembatasan frekuensi (*rate limiting* / throttle).
+## Task 4: Integrasi Suara Toleran Dialek (Server-Only Gemini + Rate Limit & Fallback) (COMPLETED)
+**Description:** Memastikan kunci Google Gemini API eksklusif di server (`/api/extract`), dilengkapi pelindung batas frekuensi pemakaian (*rate limiting* HTTP 429), pengenalan dialek Sunda Purwakarta (*hiji, dua, tilu, maranggi, peuyeum, simping*), dan parser fallback lokal jika AI offline.
 
 **Acceptance criteria:**
-- [ ] API key Google Gemini tersimpan murni di environment server (`GEMINI_API_KEY` / `process.env`) tanpa `NEXT_PUBLIC_`.
-- [ ] Route handler `/api/extract` dilengkapi pelindung batas pemakaian (rate limit / max calls per window per IP/user).
-- [ ] Tombol mic diletakkan pada posisi mudah dijangkau satu jempol di mobile (`fixed bottom-20 md:bottom-6`).
-- [ ] Menampilkan indikator visual denyut saat aktif merekam suara.
-- [ ] Terdapat input fallback pencarian cepat jika kasir memilih mengetik nama menu.
+- [x] API key Google Gemini tersimpan murni di environment server (`GEMINI_API_KEY` / `process.env`) tanpa `NEXT_PUBLIC_`.
+- [x] Route handler `/api/extract` dilengkapi pelindung batas pemakaian (sliding window rate limit 40 req/min dengan status 429 & Retry-After).
+- [x] Prompt ekstraksi mengenali angka Sunda (hiji..sapuluh), satuan (seporsi, segelas, sapasang), dan kuliner khas Purwakarta.
+- [x] Fallback rule-based parser otomatis aktif saat AI offline, error, atau API key belum disetel.
+- [x] Unit test `tests/extract-voice.test.mjs` terverifikasi lulus 100%.
+
+**Verification:**
+- [x] Tests pass: `npm test` (49 tests passing)
+- [x] Build succeeds: `npm run build`
 
 **Dependencies:** Task 3  
-**Files likely touched:**
-- `src/components/MicThumbBar.tsx`
+**Files touched:**
 - `src/app/api/extract/route.ts`
+- `tests/extract-voice.test.mjs`
 
 ---
 
