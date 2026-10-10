@@ -100,19 +100,25 @@
 
 ---
 
-## Task 5: Panel Draf Pesanan & Editor Kuantitas
-**Description:** Membangun panel draf pesanan (*Draft Order Drawer/Card*) di mana kasir dapat melihat draf pesanan, mengoreksi salah dengar, mengubah jumlah item (`+` / `-`), dan menghapus item sebelum pembayaran.
+## Task 5: Panel Draf Pesanan & Editor Kuantitas (COMPLETED)
+**Description:** Membangun panel draf pesanan di mana kasir dapat meninjau draf pesanan, mengoreksi salah dengar/salah ketuk, mengubah jumlah item (`+` / `−` minimal 48px), dan menghapus item sebelum pembayaran.
 
 **Acceptance criteria:**
-- [ ] Setiap baris item menampilkan nama, kuantitas, harga satuan, dan subtotal.
-- [ ] Tombol kontrol kuantitas berukuran minimal 40×40px dengan feedback sentuh yang jelas.
-- [ ] Tampilan total belanja menggunakan teks besar `tabular-nums font-bold`.
-- [ ] Tidak ada data yang tersimpan otomatis ke database sebelum konfirmasi eksplisit.
+- [x] Setiap baris item berupa kartu bertumpuk dengan nama penuh, kuantitas, harga satuan, dan subtotal.
+- [x] Tombol stepper kuantitas berukuran $\ge 48$px dengan feedback sentuh aktif.
+- [x] Tampilan total belanja menggunakan teks besar `tabular-nums font-extrabold`.
+- [x] Tidak ada data yang tersimpan otomatis sebelum kasir melakukan konfirmasi final.
+- [x] Unit test `tests/cashier-draft.test.mjs` terverifikasi lulus 100%.
+
+**Verification:**
+- [x] Tests pass: `npm test`
+- [x] Build succeeds: `npm run build`
 
 **Dependencies:** Task 3, Task 4  
-**Files likely touched:**
-- `src/components/DraftOrderDrawer.tsx`
+**Files touched:**
+- `src/components/TransactionCard.tsx`
 - `src/app/dashboard/page.tsx`
+- `tests/cashier-draft.test.mjs`
 
 ---
 
