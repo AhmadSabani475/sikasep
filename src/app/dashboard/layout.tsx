@@ -12,9 +12,9 @@ export default function DashboardLayout({
   return (
     <AuthProvider>
       <ToastProvider>
-        <div className="flex flex-1 h-screen overflow-hidden">
+        <div className="flex flex-1 h-screen overflow-hidden bg-[#FFFBEB] text-[#1C1917]">
           <Sidebar />
-          <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
+          <main className="flex-1 overflow-y-auto pb-24 md:pb-0 relative">
             {children}
           </main>
           <BottomNav />
