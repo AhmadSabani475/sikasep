@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import type { MenuItem } from '@/types';
 import { formatRupiah } from '@/lib/mock-data';
+import { AngloIcon, KendiIcon, FoodTrayIcon } from '@/components/icons/PurwakartaIcons';
 
 interface QuickMenuGridProps {
   items: MenuItem[];
@@ -86,14 +87,14 @@ export function QuickMenuGrid({
           )}
         </div>
 
-        {/* Category Pills */}
+        {/* Category Pills with Purwakarta Cultural Icons */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
           {(
             [
-              { id: 'semua', label: 'Semua' },
-              { id: 'makanan', label: 'Makanan' },
-              { id: 'minuman', label: 'Minuman' },
-              { id: 'camilan', label: 'Oleh-oleh' },
+              { id: 'semua', label: 'Semua', icon: null },
+              { id: 'makanan', label: 'Makanan', icon: <AngloIcon size={15} strokeWidth={2} /> },
+              { id: 'minuman', label: 'Minuman', icon: <KendiIcon size={15} strokeWidth={2} /> },
+              { id: 'camilan', label: 'Oleh-oleh', icon: <FoodTrayIcon size={15} strokeWidth={2} /> },
             ] as const
           ).map((cat) => {
             const isActive = selectedCategory === cat.id;
@@ -101,13 +102,14 @@ export function QuickMenuGrid({
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all min-h-[48px] flex items-center justify-center cursor-pointer ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all min-h-[48px] flex items-center justify-center gap-1.5 cursor-pointer ${
                   isActive
                     ? 'bg-[#9A3412] text-[#FFFBEB] shadow-2xs'
                     : 'bg-white text-[#57534E] border border-[#E7E0D3] hover:bg-[#FDF6E2] hover:text-[#1C1917]'
                 }`}
               >
-                {cat.label}
+                {cat.icon}
+                <span>{cat.label}</span>
               </button>
             );
           })}

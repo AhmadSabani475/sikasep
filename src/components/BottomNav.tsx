@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { FoodTrayIcon, ReceiptIcon } from '@/components/icons/PurwakartaIcons';
 
 const navItems = [
   {
@@ -18,23 +19,12 @@ const navItems = [
   {
     href: '/dashboard/menu',
     label: 'Menu',
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M3 6h18" />
-        <path d="M3 12h18" />
-        <path d="M3 18h18" />
-      </svg>
-    ),
+    icon: <FoodTrayIcon size={20} strokeWidth={2} />,
   },
   {
     href: '/dashboard/riwayat',
     label: 'Riwayat',
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="10" />
-        <polyline points="12 6 12 12 16 14" />
-      </svg>
-    ),
+    icon: <ReceiptIcon size={20} strokeWidth={2} />,
   },
   {
     href: '/dashboard/rekap',

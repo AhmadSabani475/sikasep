@@ -116,19 +116,27 @@
 
 ---
 
-## Task 6: Ikonografi Khas Purwakarta (SVG Murni Kendi, Anglo, Iket Sunda — Tanpa Emoji)
-**Description:** Membuat kumpulan komponen ikon SVG monoline berkarakter lokal Purwakarta: Kendi air (logo/minuman), Anglo (dapur/makanan panas), dan Iket Sunda (profil/sapaan wirausaha) untuk menggantikan emoji pada seluruh komponen yang sudah terbangun.
+## Task 6: Ikonografi Khas Purwakarta (SVG Murni Kendi, Anglo, Iket Sunda — Tanpa Emoji) (COMPLETED)
+**Description:** Membuat kumpulan komponen ikon SVG monoline berkarakter lokal Purwakarta: Kendi air (logo/minuman), Anglo (dapur/makanan panas), Iket Sunda (profil/sapaan wirausaha), FoodTray (nampan saji kuliner), dan Receipt (struk transaksi) untuk memperkuat identitas khas tanpa emoji.
 
 **Acceptance criteria:**
-- [ ] Berkas `src/components/icons/PurwakartaIcons.tsx` menyediakan ikon: `KendiIcon`, `AngloIcon`, `IketIcon`, `FoodTrayIcon`, `ReceiptIcon`.
-- [ ] Seluruh ikon menggunakan stroke monoline 1.75px–2px, berskala responsif, dan menyertakan `aria-hidden` atau label yang aksesibel.
-- [ ] Mengganti seluruh sisa emoji di Quick Menu Grid, Drawer, dan Navigasi dengan ikon SVG.
+- [x] Berkas `src/components/icons/PurwakartaIcons.tsx` menyediakan ikon: `KendiIcon`, `AngloIcon`, `IketIcon`, `FoodTrayIcon`, `ReceiptIcon`.
+- [x] Seluruh ikon menggunakan stroke monoline 2px, berskala responsif, dan menyertakan `aria-hidden` aksesibel.
+- [x] Terintegrasi ke Sidebar (logo Kendi & nav item), BottomNav (Menu & Riwayat), serta QuickMenuGrid (tab kategori Makanan, Minuman, Oleh-oleh).
+- [x] Nol emoji pada seluruh komponen ikonografi.
+- [x] Unit test `tests/purwakarta-icons.test.mjs` terverifikasi lulus 100%.
 
-**Dependencies:** Task 5  
-**Files likely touched:**
+**Verification:**
+- [x] Tests pass: `npm test` (54 tests passing)
+- [x] Build succeeds: `npm run build`
+
+**Dependencies:** Task 1, Task 2, Task 3  
+**Files touched:**
 - `src/components/icons/PurwakartaIcons.tsx`
-- `src/components/QuickMenuGrid.tsx`
 - `src/components/Sidebar.tsx`
+- `src/components/BottomNav.tsx`
+- `src/components/QuickMenuGrid.tsx`
+- `tests/purwakarta-icons.test.mjs`
 
 ---
 
