@@ -45,6 +45,7 @@ export interface ParsedItem {
   harga_satuan: number;
   subtotal: number;
   is_custom?: boolean;
+  menu_item_id?: string | null;
 }
 
 export type MicStatus = 'idle' | 'recording' | 'processing' | 'done' | 'error';

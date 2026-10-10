@@ -4,7 +4,8 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import MicButton from '@/components/MicButton';
 import TransactionCard from '@/components/TransactionCard';
 import SuccessAnimation from '@/components/SuccessAnimation';
-import { formatRupiah } from '@/lib/mock-data';
+import QuickMenuGrid from '@/components/QuickMenuGrid';
+import { formatRupiah, mockMenuItems } from '@/lib/mock-data';
 import type { ParsedItem, ParsedTransactionResult, MenuItem } from '@/types';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
@@ -17,10 +18,10 @@ export default function KasirPage() {
   const [parsedResult, setParsedResult] = useState<ParsedTransactionResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
-  
+
   const [todayTotal, setTodayTotal] = useState(0);
   const [todayCount, setTodayCount] = useState(0);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(mockMenuItems);
   const [error, setError] = useState<string | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const lastSpeakingTimeRef = useRef<number>(0);
@@ -32,37 +33,89 @@ export default function KasirPage() {
   useEffect(() => {
     async function loadInitialData() {
       if (store) {
-        const [items, stats] = await Promise.all([
-          getMenuItems(store.id),
-          getTodayTotal(store.id)
-        ]);
-        setMenuItems(items);
-        setTodayTotal(stats.total);
-        setTodayCount(stats.count);
+        try {
+          const [items, stats] = await Promise.all([
+            getMenuItems(store.id),
+            getTodayTotal(store.id),
+          ]);
+          setMenuItems(items.length > 0 ? items : mockMenuItems);
+          setTodayTotal(stats.total);
+          setTodayCount(stats.count);
+        } catch {
+          // Fallback to mock data if offline or demo
+          setMenuItems(mockMenuItems);
+        }
       }
     }
     loadInitialData();
   }, [store]);
 
   useEffect(() => {
-    if (isSpeaking) {
-      lastSpeakingTimeRef.current = Date.now();
-    } else {
-      lastSpeakingTimeRef.current = Date.now();
-    }
+    lastSpeakingTimeRef.current = Date.now();
   }, [isSpeaking]);
+
+  const executeSave = async (items: ParsedItem[], total: number, currentTranscript: string) => {
+    if (!store) {
+      // Demo mode fallback save
+      setSavedCount((c) => c + 1);
+      setLastSavedAmount(formatRupiah(total));
+      setShowSuccess(true);
+      setTodayTotal((prev) => prev + total);
+      setTodayCount((prev) => prev + 1);
+      setParsedResult(null);
+      setTranscript(null);
+      toast.success('Transaksi demo berhasil disimpan!');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    const itemsToSave = items.map((item) => ({
+      menu_item_id: item.menu_item_id || null,
+      item_name: item.nama,
+      quantity: item.jumlah,
+      unit_price: item.harga_satuan,
+      subtotal: item.subtotal,
+    }));
+
+    const tx = await createTransaction(store.id, currentTranscript, total, itemsToSave);
+
+    if (tx) {
+      setSavedCount((c) => c + 1);
+      setLastSavedAmount(formatRupiah(total));
+      setShowSuccess(true);
+      const stats = await getTodayTotal(store.id);
+      setTodayTotal(stats.total);
+      setTodayCount(stats.count);
+
+      setParsedResult(null);
+      setTranscript(null);
+
+      toast.success('Transaksi berhasil disimpan!');
+    } else {
+      toast.error('Gagal menyimpan transaksi. Coba lagi.');
+    }
+
+    setIsProcessing(false);
+  };
+
+  const handleSave = useCallback(
+    async (items: ParsedItem[], total: number) => {
+      await executeSave(items, total, transcript || 'Input manual kasir');
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [store, transcript]
+  );
 
   const handleTranscript = useCallback(
     async (text: string) => {
       const timeSinceSpeaking = Date.now() - lastSpeakingTimeRef.current;
       if (isSpeaking || timeSinceSpeaking < 2500) {
-        console.log('Mengabaikan suara (AI masih/baru saja bicara):', text);
         return;
       }
-      
+
       const lowerText = text.toLowerCase();
       if (lowerText.includes('berhasil disimpan') || lowerText.includes('rupiah')) {
-        console.log('Mengabaikan suara AI (berdasarkan kata kunci):', text);
         return;
       }
 
@@ -76,8 +129,8 @@ export default function KasirPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             transcript: text,
-            menuItems: menuItems.filter(m => m.is_active).map(m => ({ nama: m.name, harga: m.price }))
-          })
+            menuItems: menuItems.map((m) => ({ nama: m.name, harga: m.price })),
+          }),
         });
 
         if (!res.ok) {
@@ -85,12 +138,12 @@ export default function KasirPage() {
         }
 
         const data: ParsedTransactionResult = await res.json();
-        data.items = data.items.map(item => {
-          const matchedMenu = menuItems.find(m => m.name === item.nama);
+        data.items = data.items.map((item) => {
+          const matchedMenu = menuItems.find((m) => m.name === item.nama);
           if (matchedMenu) {
             return {
               ...item,
-              menu_item_id: matchedMenu.id 
+              menu_item_id: matchedMenu.id,
             };
           }
           return { ...item, is_custom: true };
@@ -100,16 +153,17 @@ export default function KasirPage() {
 
         if (voiceEnabled && 'speechSynthesis' in window) {
           const isAutoSaved = autoSave && data.item_tidak_dikenal.length === 0;
-          const textMsg = data.items.map(i => `${i.jumlah} ${i.nama}`).join(', ') + `. Total ${data.total} rupiah.${isAutoSaved ? ' Berhasil disimpan.' : ''}`;
+          const textMsg =
+            data.items.map((i) => `${i.jumlah} ${i.nama}`).join(', ') +
+            `. Total ${data.total} rupiah.${isAutoSaved ? ' Berhasil disimpan.' : ''}`;
           const utterance = new SpeechSynthesisUtterance(textMsg);
           utterance.lang = 'id-ID';
-          
+
           setIsSpeaking(true);
-          
           utterance.onstart = () => setIsSpeaking(true);
           utterance.onend = () => setTimeout(() => setIsSpeaking(false), 500);
           utterance.onerror = () => setIsSpeaking(false);
-          
+
           window.speechSynthesis.speak(utterance);
         }
 
@@ -125,73 +179,75 @@ export default function KasirPage() {
         setIsProcessing(false);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [menuItems, autoSave, voiceEnabled]
   );
 
-  const executeSave = async (items: ParsedItem[], total: number, currentTranscript: string) => {
-    if (!store) return;
-    setIsProcessing(true);
-    
-    const itemsToSave = items.map((item: any) => ({
-      menu_item_id: item.menu_item_id || null, // Will be null for custom items
-      item_name: item.nama,
-      quantity: item.jumlah,
-      unit_price: item.harga_satuan,
-      subtotal: item.subtotal
-    }));
+  // Quick Grid manual tap selection (instant optimistic add to draft)
+  const handleSelectMenuItem = useCallback((item: MenuItem) => {
+    setParsedResult((prev) => {
+      const existingItems = prev ? [...prev.items] : [];
+      const index = existingItems.findIndex(
+        (i) => i.nama.toLowerCase() === item.name.toLowerCase() || i.menu_item_id === item.id
+      );
 
-    const tx = await createTransaction(store.id, currentTranscript, total, itemsToSave);
-    
-    if (tx) {
-      setSavedCount((c) => c + 1);
-      setLastSavedAmount(formatRupiah(total));
-      setShowSuccess(true);
-      const stats = await getTodayTotal(store.id);
-      setTodayTotal(stats.total);
-      setTodayCount(stats.count);
-      
-      setParsedResult(null);
-      setTranscript(null);
-      
-      toast.success('Transaksi berhasil disimpan!');
-    } else {
-      toast.error('Gagal menyimpan transaksi. Coba lagi.');
-    }
-    
-    setIsProcessing(false);
-  };
+      if (index >= 0) {
+        const current = existingItems[index];
+        const newQty = current.jumlah + 1;
+        existingItems[index] = {
+          ...current,
+          jumlah: newQty,
+          subtotal: newQty * current.harga_satuan,
+        };
+      } else {
+        existingItems.push({
+          nama: item.name,
+          jumlah: 1,
+          harga_satuan: item.price,
+          subtotal: item.price,
+          menu_item_id: item.id,
+        });
+      }
 
-  const handleSave = useCallback(
-    async (items: ParsedItem[], total: number) => {
-      if (transcript) {
-        await executeSave(items, total, transcript);
+      const total = existingItems.reduce((acc, curr) => acc + curr.subtotal, 0);
+
+      return {
+        items: existingItems,
+        total,
+        item_tidak_dikenal: prev ? prev.item_tidak_dikenal : [],
+      };
+    });
+  }, []);
+
+  const handleAddUnknownItem = useCallback(
+    async (itemName: string, price: number) => {
+      if (!store) return;
+      try {
+        const { createMenuItem } = await import('@/lib/supabase/queries');
+        const newItem = await createMenuItem(store.id, itemName, price);
+        if (newItem) {
+          setMenuItems((prev) => [...prev, newItem]);
+          setParsedResult((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              item_tidak_dikenal: prev.item_tidak_dikenal.filter((u) => u !== itemName),
+              items: prev.items.map((item) =>
+                item.nama === itemName
+                  ? { ...item, is_custom: false, menu_item_id: newItem.id }
+                  : item
+              ),
+            };
+          });
+          toast.success(`${itemName} berhasil ditambahkan ke menu!`);
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error('Gagal menambahkan menu');
       }
     },
-    [store, transcript]
+    [store, toast]
   );
-
-  const handleAddUnknownItem = useCallback(async (itemName: string, price: number) => {
-    if (!store) return;
-    try {
-      const { createMenuItem } = await import('@/lib/supabase/queries');
-      const newItem = await createMenuItem(store.id, itemName, price);
-      if (newItem) {
-        setMenuItems(prev => [...prev, newItem]);
-        setParsedResult(prev => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            unknownItems: prev.item_tidak_dikenal.filter(u => u !== itemName),
-            items: prev.items.map(item => item.nama === itemName ? { ...item, is_custom: false, menu_item_id: newItem.id } : item)
-          };
-        });
-        toast.success(`${itemName} berhasil ditambahkan ke menu!`);
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error('Gagal menambahkan menu');
-    }
-  }, [store, toast]);
 
   const handleCancel = useCallback(() => {
     setParsedResult(null);
@@ -199,129 +255,200 @@ export default function KasirPage() {
   }, []);
 
   return (
-    <div className="flex flex-col h-full">
-      <SuccessAnimation 
-        show={showSuccess} 
+    <div className="flex flex-col h-full bg-[#FFFBEB] text-[#1C1917]">
+      <SuccessAnimation
+        show={showSuccess}
         amount={lastSavedAmount}
-        onComplete={() => setShowSuccess(false)} 
+        onComplete={() => setShowSuccess(false)}
       />
-      <header className="px-6 py-5 border-b border-white/5">
+
+      {/* Top Header POS */}
+      <header className="px-5 py-4 md:px-8 bg-white border-b border-[#E7E0D3] shadow-2xs">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold">Kasir</h1>
-            <p className="text-xs text-text-muted mt-0.5">Ucapkan pesanan untuk mencatat transaksi</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg md:text-xl font-bold text-[#1C1917]">Kasir Sikasep</h1>
+              <span className="text-[10px] font-bold text-[#9A3412] bg-[#FDF6E2] px-2 py-0.5 rounded-full border border-[#E7E0D3]">
+                Hybrid Suara + Sentuh
+              </span>
+            </div>
+            <p className="text-xs text-[#57534E] mt-0.5">
+              Tap katalog cepat atau gunakan tombol suara untuk mencatat pesanan
+            </p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-4">
+
+          <div className="flex items-center gap-5">
+            {/* Today Summary */}
+            <div className="hidden sm:flex items-center gap-4 bg-[#FDF6E2] px-4 py-2 rounded-xl border border-[#E7E0D3]">
               <div className="text-right">
-                <p className="text-[11px] text-text-muted">Hari ini</p>
-                <p className="text-sm font-bold text-primary-400">{formatRupiah(todayTotal)}</p>
+                <p className="text-[10px] uppercase font-bold text-[#78350F]">Omzet Hari Ini</p>
+                <p className="text-sm font-extrabold text-[#9A3412] tabular-nums">
+                  {formatRupiah(todayTotal)}
+                </p>
               </div>
-              <div className="w-px h-8 bg-white/10" />
+              <div className="w-px h-7 bg-[#E7E0D3]" />
               <div className="text-right">
-                <p className="text-[11px] text-text-muted">Transaksi</p>
-                <p className="text-sm font-bold text-text-primary">{todayCount}</p>
+                <p className="text-[10px] uppercase font-bold text-[#78350F]">Transaksi</p>
+                <p className="text-sm font-extrabold text-[#1C1917] tabular-nums">{todayCount}</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <label className="text-xs text-text-muted cursor-pointer flex items-center gap-1.5">
-                <input 
-                  type="checkbox" 
-                  checked={autoSave} 
-                  onChange={(e) => setAutoSave(e.target.checked)} 
-                  className="rounded border-white/20 bg-surface-700 text-primary-500 focus:ring-primary-500/50"
+
+            {/* Quick Settings */}
+            <div className="flex items-center gap-3">
+              <label className="text-xs font-semibold text-[#57534E] cursor-pointer flex items-center gap-1.5 select-none">
+                <input
+                  type="checkbox"
+                  checked={voiceEnabled}
+                  onChange={(e) => setVoiceEnabled(e.target.checked)}
+                  className="rounded border-[#E7E0D3] text-[#9A3412] focus:ring-[#9A3412]/30"
                 />
-                Auto Simpan
-              </label>
-              <label className="text-xs text-text-muted cursor-pointer flex items-center gap-1.5">
-                <input 
-                  type="checkbox" 
-                  checked={voiceEnabled} 
-                  onChange={(e) => setVoiceEnabled(e.target.checked)} 
-                  className="rounded border-white/20 bg-surface-700 text-primary-500 focus:ring-primary-500/50"
-                />
-                Suara
+                Suara AI
               </label>
             </div>
           </div>
         </div>
       </header>
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 gap-6">
-        <div className="flex sm:hidden items-center gap-6 glass rounded-2xl px-6 py-3">
+
+      {/* Main Content Area: Hybrid Grid + Draft Order Card */}
+      <div className="flex-1 overflow-y-auto px-4 py-5 md:px-8 space-y-6 max-w-7xl w-full mx-auto">
+        {/* Mobile Today Stats Bar */}
+        <div className="flex sm:hidden items-center justify-around bg-white border border-[#E7E0D3] rounded-xl p-3 shadow-2xs">
           <div className="text-center">
-            <p className="text-[11px] text-text-muted">Omzet Hari Ini</p>
-            <p className="text-base font-bold text-primary-400">{formatRupiah(todayTotal)}</p>
+            <p className="text-[10px] uppercase font-bold text-[#78350F]">Omzet Hari Ini</p>
+            <p className="text-sm font-extrabold text-[#9A3412] tabular-nums">
+              {formatRupiah(todayTotal)}
+            </p>
           </div>
-          <div className="w-px h-8 bg-white/10" />
+          <div className="w-px h-6 bg-[#E7E0D3]" />
           <div className="text-center">
-            <p className="text-[11px] text-text-muted">Transaksi</p>
-            <p className="text-base font-bold text-text-primary">{todayCount}</p>
+            <p className="text-[10px] uppercase font-bold text-[#78350F]">Transaksi</p>
+            <p className="text-sm font-extrabold text-[#1C1917] tabular-nums">{todayCount}</p>
           </div>
         </div>
+
         {error && (
-          <div className="px-4 py-3 rounded-xl bg-danger-500/10 border border-danger-500/20 text-danger-500 text-sm animate-fade-in text-center max-w-md w-full">
-            {error}
-            <button 
+          <div className="px-4 py-3 rounded-xl bg-[#FEE2E2] border border-[#FCA5A5] text-[#991B1B] text-xs font-medium animate-fade-in flex items-center justify-between">
+            <span>{error}</span>
+            <button
               onClick={() => setError(null)}
-              className="block mt-2 mx-auto text-xs font-medium hover:underline"
+              className="text-xs font-bold underline hover:no-underline ml-3"
             >
-              Coba Lagi
+              Tutup
             </button>
           </div>
         )}
-        <div className={parsedResult || isProcessing ? 'hidden' : 'block'}>
-          <MicButton onTranscript={handleTranscript} disabled={isProcessing || isSpeaking || !store || menuItems.length === 0} />
-        </div>
-        
-        {!isProcessing && !parsedResult && store && menuItems.length === 0 && (
-          <p className="text-sm text-text-muted text-center">
-            Anda belum memiliki menu.<br/>Silakan tambah menu di halaman Menu terlebih dahulu.
-          </p>
-        )}
-        {isProcessing && (
-          <div className="flex flex-col items-center gap-4 animate-fade-in">
-            <div className="w-20 h-20 rounded-full glass flex items-center justify-center">
-              <svg className="w-8 h-8 text-primary-400 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
+
+        {/* 2-Column Responsive Layout on Desktop, Vertical on Mobile */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left: Quick Menu Grid (Katalog Cepat) */}
+          <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm md:text-base font-bold text-[#1C1917]">
+                Katalog Menu Cepat
+              </h2>
+              <span className="text-xs text-[#57534E]">
+                {menuItems.length} produk siap tap
+              </span>
             </div>
-            <div className="text-center">
-              <p className="text-sm font-medium text-text-primary">Memproses pesanan...</p>
-              <p className="text-xs text-text-muted mt-1">AI sedang mengekstrak data</p>
-            </div>
-            {transcript && (
-              <div className="glass rounded-xl px-4 py-2 max-w-md">
-                <p className="text-xs text-text-muted text-center">&ldquo;{transcript}&rdquo;</p>
-              </div>
-            )}
-          </div>
-        )}
-        {parsedResult && !isProcessing && (
-          <div className="w-full max-w-2xl">
-            <TransactionCard
-              items={parsedResult.items}
-              total={parsedResult.total}
-              unknownItems={parsedResult.item_tidak_dikenal}
-              rawTranscript={transcript || undefined}
-              onSave={handleSave}
-              onCancel={handleCancel}
-              onAddUnknownItem={handleAddUnknownItem}
+
+            <QuickMenuGrid
+              items={menuItems}
+              onSelectItem={handleSelectMenuItem}
             />
           </div>
-        )}
-        {!parsedResult && !isProcessing && savedCount > 0 && !error && (
-          <div className="glass rounded-xl px-4 py-2 text-xs text-primary-400 font-medium animate-fade-in flex items-center gap-2">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 6 9 17l-5-5" />
-            </svg>
-            Transaksi berhasil disimpan!
+
+          {/* Right: Active Order / Draft Review Card */}
+          <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-4 sticky top-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm md:text-base font-bold text-[#1C1917]">
+                Draf Transaksi
+              </h2>
+              {parsedResult && parsedResult.items.length > 0 && (
+                <button
+                  onClick={handleCancel}
+                  className="text-xs font-semibold text-[#B91C1C] hover:underline"
+                >
+                  Kosongkan
+                </button>
+              )}
+            </div>
+
+            {/* If there is active items in draft */}
+            {parsedResult && parsedResult.items.length > 0 ? (
+              <div className="bg-white rounded-2xl border border-[#E7E0D3] p-4 shadow-sm animate-fade-in">
+                <TransactionCard
+                  items={parsedResult.items}
+                  total={parsedResult.total}
+                  unknownItems={parsedResult.item_tidak_dikenal}
+                  rawTranscript={transcript || undefined}
+                  onSave={handleSave}
+                  onCancel={handleCancel}
+                  onAddUnknownItem={handleAddUnknownItem}
+                />
+              </div>
+            ) : isProcessing ? (
+              <div className="bg-white rounded-2xl border border-[#E7E0D3] p-8 text-center flex flex-col items-center gap-3 animate-fade-in shadow-2xs">
+                <div className="w-14 h-14 rounded-full bg-[#FDF6E2] text-[#9A3412] flex items-center justify-center animate-spin">
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                </div>
+                <p className="text-sm font-bold text-[#1C1917]">Memproses ucapan kasir...</p>
+                <p className="text-xs text-[#57534E]">AI sedang merapikan item ke draf pesanan</p>
+                {transcript && (
+                  <div className="bg-[#FFFBEB] rounded-xl px-3.5 py-1.5 border border-[#E7E0D3] mt-2">
+                    <p className="text-xs text-[#78350F] italic">&ldquo;{transcript}&rdquo;</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-[#E7E0D3] p-6 text-center flex flex-col items-center justify-center gap-3 shadow-2xs min-h-[220px]">
+                <div className="w-12 h-12 rounded-full bg-[#FDF6E2] text-[#9A3412] flex items-center justify-center">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="9" cy="21" r="1" />
+                    <circle cx="20" cy="21" r="1" />
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-[#1C1917]">Draf Masih Kosong</p>
+                  <p className="text-xs text-[#57534E] mt-1 max-w-xs leading-relaxed">
+                    Sentuh menu di katalog cepat atau ucapkan pesanan lewat mikrofon untuk mulai mencatat.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Permanent Voice Shortcut Bar / Button in Draft Area */}
+            <div className="bg-white rounded-xl border border-[#E7E0D3] p-4 flex items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-[#FDF6E2] text-[#9A3412] flex items-center justify-center">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" x2="12" y1="19" y2="22" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-[#1C1917]">Input Suara Kasir</p>
+                  <p className="text-[11px] text-[#57534E]">Bicara pesanan sekaligus</p>
+                </div>
+              </div>
+
+              <div>
+                <MicButton
+                  onTranscript={handleTranscript}
+                  disabled={isProcessing || isSpeaking}
+                />
+              </div>
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
