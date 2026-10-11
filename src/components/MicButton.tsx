@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { MicStatus } from '@/types';
+import type { MicGate } from '@/lib/voice/mic-gate';
 
 interface SpeechRecognitionEvent extends Event {
   resultIndex: number;
@@ -43,57 +44,47 @@ declare global {
 interface MicButtonProps {
   onTranscript: (text: string) => void;
   disabled?: boolean;
+  micGate?: MicGate;
+  isRamai?: boolean;
+  onToggleRamai?: (active: boolean) => void;
 }
 
 let globalContinuousMode = false;
 
-export default function MicButton({ onTranscript, disabled = false }: MicButtonProps) {
+export default function MicButton({
+  onTranscript,
+  disabled = false,
+  micGate,
+  isRamai: controlledIsRamai,
+  onToggleRamai,
+}: MicButtonProps) {
   const [status, setStatus] = useState<MicStatus>('idle');
   const [interimText, setInterimText] = useState('');
   const [isSupported, setIsSupported] = useState(true);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const [fallbackText, setFallbackText] = useState('');
-  const [continuousMode, setContinuousMode] = useState(globalContinuousMode);
-  const continuousModeRef = useRef(globalContinuousMode);
+  
+  // Mode Ramai state (controlled if prop provided, else local)
+  const isControlled = controlledIsRamai !== undefined;
+  const [localContinuousMode, setLocalContinuousMode] = useState(globalContinuousMode);
+  const continuousMode = isControlled ? controlledIsRamai : localContinuousMode;
+  const continuousModeRef = useRef(continuousMode);
+  
+  const [isRamaiPaused, setIsRamaiPaused] = useState(false);
+  const isRamaiPausedRef = useRef(false);
+  const isAppSoundMutedRef = useRef(false);
+
   const [audioLevel, setAudioLevel] = useState(0);
   const animFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const supported = typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
-    setIsSupported(supported);
-
-    if (supported && globalContinuousMode) {
-      let retryCount = 0;
-      let timer: ReturnType<typeof setTimeout>;
-
-      const tryStart = () => {
-        if (typeof window !== 'undefined' && window.speechSynthesis && window.speechSynthesis.speaking) {
-          timer = setTimeout(tryStart, 1000);
-          return;
-        }
-
-        try {
-          startRecording();
-        } catch (e) {
-          if (retryCount < 10) {
-            retryCount++;
-            timer = setTimeout(tryStart, 1000);
-          } else {
-            console.error('Failed to auto-resume mic after 10 retries', e);
-          }
-        }
-      };
-
-      timer = setTimeout(tryStart, 1000);
-
-      return () => clearTimeout(timer);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    continuousModeRef.current = continuousMode;
+    globalContinuousMode = continuousMode;
+  }, [continuousMode]);
 
   useEffect(() => {
-    continuousModeRef.current = continuousMode;
-  }, [continuousMode]);
+    isRamaiPausedRef.current = isRamaiPaused;
+  }, [isRamaiPaused]);
 
   const startAudioVisualization = useCallback(() => {
     const updateLevel = () => {
@@ -102,7 +93,6 @@ export default function MicButton({ onTranscript, disabled = false }: MicButtonP
         requestAnimationFrame(updateLevel);
       }, 150);
     };
-
     updateLevel();
   }, []);
 
@@ -115,7 +105,9 @@ export default function MicButton({ onTranscript, disabled = false }: MicButtonP
   }, []);
 
   const startRecording = useCallback(() => {
-    const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+    const SpeechRecognition = typeof window !== 'undefined'
+      ? (window.webkitSpeechRecognition || window.SpeechRecognition)
+      : null;
     if (!SpeechRecognition) return;
 
     if (recognitionRef.current) {
@@ -135,9 +127,18 @@ export default function MicButton({ onTranscript, disabled = false }: MicButtonP
       setStatus('recording');
       setInterimText('');
       startAudioVisualization();
+      micGate?.setListening(true);
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
+      // Echo defense: buang hasil jika suara aplikasi sedang diputar
+      if (micGate && !micGate.acceptsResult()) {
+        return;
+      }
+      if (isAppSoundMutedRef.current) {
+        return;
+      }
+
       let finalTranscript = '';
       let currentInterim = '';
 
@@ -161,26 +162,33 @@ export default function MicButton({ onTranscript, disabled = false }: MicButtonP
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.warn('Speech recognition error:', event.error);
-      if (event.error === 'no-speech' && continuousModeRef.current) {
+      // Abaikan error 'aborted' karena dipicu secara sengaja saat mic dijeda/dihentikan
+      if (event.error === 'aborted') {
         return;
       }
+      if (event.error === 'no-speech' && continuousModeRef.current && !isRamaiPausedRef.current) {
+        return;
+      }
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        continuousModeRef.current = false;
+      }
+      console.warn('Speech recognition error:', event.error);
       setStatus('error');
       stopAudioVisualization();
+      micGate?.setListening(false);
     };
 
     recognition.onend = () => {
       stopAudioVisualization();
-      if (continuousModeRef.current) {
+      micGate?.setListening(false);
+      recognitionRef.current = null;
+      
+      if (continuousModeRef.current && !isRamaiPausedRef.current && !isAppSoundMutedRef.current) {
         setTimeout(() => {
-          if (continuousModeRef.current) {
-            try {
-              recognition.start();
-            } catch {
-              setStatus('idle');
-            }
+          if (continuousModeRef.current && !isRamaiPausedRef.current && !isAppSoundMutedRef.current) {
+            startRecordingRef.current();
           }
-        }, 500);
+        }, 300);
       } else {
         setStatus('idle');
         setInterimText('');
@@ -193,39 +201,111 @@ export default function MicButton({ onTranscript, disabled = false }: MicButtonP
     } catch (e) {
       console.error('Failed to start recognition:', e);
       setStatus('error');
+      micGate?.setListening(false);
     }
-  }, [onTranscript, startAudioVisualization, stopAudioVisualization]);
+  }, [onTranscript, startAudioVisualization, stopAudioVisualization, micGate]);
+
+  const startRecordingRef = useRef<() => void>(startRecording);
+  useEffect(() => {
+    startRecordingRef.current = startRecording;
+  }, [startRecording]);
 
   const stopRecording = useCallback(() => {
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
       setStatus('idle');
       stopAudioVisualization();
+      micGate?.setListening(false);
     }
-  }, [stopAudioVisualization]);
+  }, [stopAudioVisualization, micGate]);
 
+  // Daftarkan controller ke MicGate untuk menjeda saat suara aplikasi diputar
+  useEffect(() => {
+    if (micGate?.setRecognizer) {
+      micGate.setRecognizer({
+        pause: () => {
+          isAppSoundMutedRef.current = true;
+          if (recognitionRef.current) {
+            try {
+              recognitionRef.current.abort();
+            } catch {
+              // ignore
+            }
+          }
+          stopAudioVisualization();
+        },
+        resume: () => {
+          isAppSoundMutedRef.current = false;
+          if (continuousModeRef.current && !isRamaiPausedRef.current) {
+            startRecordingRef.current();
+          }
+        },
+      });
+    }
+  }, [micGate, stopAudioVisualization]);
+
+  useEffect(() => {
+    const supported = typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
+    setIsSupported(supported);
+
+    if (supported && continuousMode) {
+      const timer = setTimeout(() => {
+        if (!isRamaiPausedRef.current) {
+          try {
+            startRecording();
+          } catch (e) {
+            console.error('Failed to auto-start mic in Mode Ramai', e);
+          }
+        }
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [continuousMode, startRecording]);
+
+  // Klik tombol mic besar
   const handleClick = () => {
-    if (status === 'recording') {
-      stopRecording();
-      if (continuousMode) {
-        setContinuousMode(false);
-        globalContinuousMode = false;
+    if (continuousMode) {
+      // Di Mode Ramai: 1 ketukan untuk menjeda / melanjutkan (SPEC §7.1)
+      if (isRamaiPaused) {
+        setIsRamaiPaused(false);
+        isRamaiPausedRef.current = false;
+        startRecording();
+      } else {
+        setIsRamaiPaused(true);
+        isRamaiPausedRef.current = true;
+        stopRecording();
       }
     } else {
-      startRecording();
+      // Di Mode Normal: 1 ketukan mulai / berhenti
+      if (status === 'recording') {
+        stopRecording();
+      } else {
+        startRecording();
+      }
     }
   };
 
+  // Toggle Mode Ramai via tombol saklar bawah
   const handleContinuousToggle = () => {
-    if (continuousMode) {
-      setContinuousMode(false);
-      globalContinuousMode = false;
+    const nextVal = !continuousMode;
+    if (isControlled && onToggleRamai) {
+      onToggleRamai(nextVal);
+    } else {
+      setLocalContinuousMode(nextVal);
+    }
+    setIsRamaiPaused(false);
+    isRamaiPausedRef.current = false;
+
+    if (!nextVal) {
       stopRecording();
     } else {
-      setContinuousMode(true);
-      globalContinuousMode = true;
       if (status !== 'recording') {
-        startRecording();
+        setTimeout(startRecording, 100);
       }
     }
   };
@@ -261,7 +341,7 @@ export default function MicButton({ onTranscript, disabled = false }: MicButtonP
             <button
               type="submit"
               disabled={!fallbackText.trim()}
-              className="px-5 py-2.5 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] text-[#FFFBEB] text-sm font-semibold disabled:opacity-40 transition-all min-h-[44px]"
+              className="px-5 py-2.5 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] text-[#FFFBEB] text-sm font-semibold disabled:opacity-40 transition-all min-h-[48px]"
             >
               Proses
             </button>
@@ -273,18 +353,24 @@ export default function MicButton({ onTranscript, disabled = false }: MicButtonP
 
   return (
     <div className="flex flex-col items-center justify-center gap-3.5 w-full">
-      {/* 1. Status Bar Rata Tengah (Tidak Terpotong) */}
-      <div className="text-xs font-semibold px-4 py-1 rounded-full bg-[#FDF6E2] border border-[#E7E0D3] text-[#78350F] h-7 flex items-center justify-center gap-1.5 shadow-2xs whitespace-nowrap min-w-[180px]">
+      {/* 1. Status Bar Rata Tengah (Aksesibel & Jelas) */}
+      <div className="text-xs font-semibold px-4 py-1 rounded-full bg-[#FDF6E2] border border-[#E7E0D3] text-[#78350F] h-7 flex items-center justify-center gap-1.5 shadow-2xs whitespace-nowrap min-w-[200px]">
         {status === 'idle' && !continuousMode && 'Tekan untuk bicara'}
-        {status === 'idle' && continuousMode && (
+        {continuousMode && !isRamaiPaused && (
           <>
-            <span className="w-2 h-2 rounded-full bg-[#9A3412] animate-pulse" />
-            <span>Mode Ramai aktif — menunggu suara...</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#9A3412] animate-pulse" />
+            <span className="text-[#9A3412]">Mode Ramai aktif — mendengarkan... (1 ketukan untuk jeda)</span>
           </>
         )}
-        {status === 'recording' && (
+        {continuousMode && isRamaiPaused && (
           <>
-            <span className="w-2 h-2 rounded-full bg-[#B91C1C] animate-pulse" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[#B45309]" />
+            <span className="text-[#B45309]">Mode Ramai dijeda — ketuk untuk lanjut</span>
+          </>
+        )}
+        {status === 'recording' && !continuousMode && (
+          <>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#B91C1C] animate-pulse" />
             <span className="text-[#B91C1C]">Merekam... tekan lagi untuk stop</span>
           </>
         )}
@@ -295,13 +381,14 @@ export default function MicButton({ onTranscript, disabled = false }: MicButtonP
 
       {/* 2. Tombol Mic Besar Berwarna Terakota Solid (#9A3412) dengan Ikon Krem (#FFFBEB) */}
       <div className="relative my-1">
-        {status === 'recording' && (
+        {/* Glow Ring saat aktif */}
+        {(status === 'recording' || (continuousMode && !isRamaiPaused)) && (
           <>
             <div
               className="absolute inset-0 rounded-full bg-[#9A3412]/30 transition-transform duration-100"
               style={{
-                transform: `scale(${1 + audioLevel * 0.5})`,
-                opacity: 0.3 + audioLevel * 0.4,
+                transform: `scale(${1 + (audioLevel || 0.15) * 0.5})`,
+                opacity: 0.3 + (audioLevel || 0.15) * 0.4,
               }}
             />
             <div className="absolute inset-0 rounded-full border-2 border-[#9A3412]/40 animate-mic-ring" />
@@ -317,15 +404,37 @@ export default function MicButton({ onTranscript, disabled = false }: MicButtonP
           disabled={disabled}
           type="button"
           className={`relative z-10 w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center transition-all focus-ring shadow-lg cursor-pointer ${
-            status === 'recording'
+            continuousMode
+              ? isRamaiPaused
+                ? 'bg-[#B45309] hover:bg-[#92400E] text-[#FFFBEB] shadow-[#B45309]/30 hover:scale-105 active:scale-95'
+                : 'bg-[#9A3412] hover:bg-[#7C2D12] text-[#FFFBEB] shadow-[#9A3412]/40 animate-pulse scale-105'
+              : status === 'recording'
               ? 'bg-[#B91C1C] hover:bg-[#991B1B] text-[#FFFBEB] shadow-[#B91C1C]/30 animate-mic-pulse scale-105'
-              : continuousMode
-              ? 'bg-[#78350F] hover:bg-[#9A3412] text-[#FFFBEB] shadow-[#78350F]/30 hover:scale-105 active:scale-95'
               : 'bg-[#9A3412] hover:bg-[#7C2D12] active:bg-[#6c2710] text-[#FFFBEB] shadow-[#9A3412]/30 hover:scale-105 active:scale-95'
           } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
-          aria-label={status === 'recording' ? 'Berhenti merekam suara' : 'Mulai merekam suara kasir'}
+          aria-label={
+            continuousMode
+              ? isRamaiPaused
+                ? 'Lanjutkan mikrofon Mode Ramai'
+                : 'Jeda mikrofon Mode Ramai'
+              : status === 'recording'
+              ? 'Berhenti merekam suara'
+              : 'Mulai merekam suara kasir'
+          }
         >
-          {status === 'recording' ? (
+          {continuousMode && isRamaiPaused ? (
+            // Icon Play / Resume saat dijeda
+            <svg
+              width="32"
+              height="32"
+              viewBox="0 0 24 24"
+              fill="#FFFBEB"
+              aria-hidden="true"
+            >
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+          ) : status === 'recording' && !continuousMode ? (
+            // Icon Stop di Mode Normal
             <svg
               width="28"
               height="28"
@@ -336,6 +445,7 @@ export default function MicButton({ onTranscript, disabled = false }: MicButtonP
               <rect x="6" y="6" width="12" height="12" rx="2" />
             </svg>
           ) : (
+            // Icon Mic
             <svg
               width="34"
               height="34"
@@ -385,7 +495,9 @@ export default function MicButton({ onTranscript, disabled = false }: MicButtonP
           <span>{continuousMode ? 'Mode Ramai: Aktif' : 'Mode Ramai'}</span>
         </button>
         <p className="text-[11px] text-[#57534E] text-center max-w-[260px] leading-tight">
-          Mic terus aktif saat antrean ramai tanpa perlu ditekan berulang
+          {continuousMode
+            ? 'Mic terus aktif & auto-save. Ketuk tombol mic untuk menjeda.'
+            : 'Mic terus aktif saat antrean ramai tanpa perlu ditekan berulang'}
         </p>
       </div>
 

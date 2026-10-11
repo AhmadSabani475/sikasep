@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/client';
+
 function getClient() {
   return createClient();
 }
+
 export interface TopMenuItem {
   item_name: string;
   total_qty: number;
@@ -16,14 +18,25 @@ export async function getTopMenuItems(
   const supabase = getClient();
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const { data: transactions, error } = await supabase
+
+  let res: any = await supabase
     .from('transactions')
-    .select('id, transaction_items(*)')
+    .select('id, status, transaction_items(*)')
     .eq('store_id', storeId)
+    .neq('status', 'dibatalkan')
     .gte('created_at', since.toISOString());
 
-  if (error || !transactions) {
-    console.error('Error fetching top menu items:', error);
+  if (res.error) {
+    res = await supabase
+      .from('transactions')
+      .select('id, transaction_items(*)')
+      .eq('store_id', storeId)
+      .gte('created_at', since.toISOString());
+  }
+
+  const transactions = res.data;
+  if (res.error || !transactions) {
+    console.error('Error fetching top menu items:', res.error);
     return [];
   }
   const itemMap: Record<string, TopMenuItem> = {};
@@ -43,6 +56,7 @@ export async function getTopMenuItems(
 
   return Object.values(itemMap).sort((a, b) => b.total_qty - a.total_qty);
 }
+
 export interface HourlyData {
   hour: number;
   count: number;
@@ -57,14 +71,24 @@ export async function getHourlyDistribution(
   const since = new Date();
   since.setDate(since.getDate() - days);
 
-  const { data, error } = await supabase
+  let res: any = await supabase
     .from('transactions')
-    .select('created_at, total_amount')
+    .select('created_at, total_amount, status')
     .eq('store_id', storeId)
+    .neq('status', 'dibatalkan')
     .gte('created_at', since.toISOString());
 
-  if (error || !data) {
-    console.error('Error fetching hourly distribution:', error);
+  if (res.error) {
+    res = await supabase
+      .from('transactions')
+      .select('created_at, total_amount')
+      .eq('store_id', storeId)
+      .gte('created_at', since.toISOString());
+  }
+
+  const data = res.data;
+  if (res.error || !data) {
+    console.error('Error fetching hourly distribution:', res.error);
     return [];
   }
   const hourly: HourlyData[] = Array.from({ length: 24 }, (_, i) => ({
@@ -82,6 +106,7 @@ export async function getHourlyDistribution(
 
   return hourly;
 }
+
 export interface WeekComparison {
   thisWeek: { total: number; count: number; avgPerTx: number };
   lastWeek: { total: number; count: number; avgPerTx: number };
@@ -95,14 +120,24 @@ export async function getWeekComparison(storeId: string): Promise<WeekComparison
   const startOfThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
   const startOfLastWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13);
 
-  const { data, error } = await supabase
+  let res: any = await supabase
     .from('transactions')
-    .select('created_at, total_amount')
+    .select('created_at, total_amount, status')
     .eq('store_id', storeId)
+    .neq('status', 'dibatalkan')
     .gte('created_at', startOfLastWeek.toISOString());
 
-  if (error || !data) {
-    console.error('Error fetching week comparison:', error);
+  if (res.error) {
+    res = await supabase
+      .from('transactions')
+      .select('created_at, total_amount')
+      .eq('store_id', storeId)
+      .gte('created_at', startOfLastWeek.toISOString());
+  }
+
+  const data = res.data;
+  if (res.error || !data) {
+    console.error('Error fetching week comparison:', res.error);
     return {
       thisWeek: { total: 0, count: 0, avgPerTx: 0 },
       lastWeek: { total: 0, count: 0, avgPerTx: 0 },
@@ -110,31 +145,35 @@ export async function getWeekComparison(storeId: string): Promise<WeekComparison
     };
   }
 
-  const thisWeekData = data.filter(tx => new Date(tx.created_at) >= startOfThisWeek);
-  const lastWeekData = data.filter(tx => {
+  const thisWeekTxs = (data as any[]).filter((tx: any) => new Date(tx.created_at) >= startOfThisWeek);
+  const lastWeekTxs = (data as any[]).filter((tx: any) => {
     const d = new Date(tx.created_at);
     return d >= startOfLastWeek && d < startOfThisWeek;
   });
 
-  const sumReduce = (arr: typeof data) => arr.reduce((sum, tx) => sum + Number(tx.total_amount), 0);
+  const thisWeekTotal = thisWeekTxs.reduce((sum: number, tx: any) => sum + Number(tx.total_amount), 0);
+  const lastWeekTotal = lastWeekTxs.reduce((sum: number, tx: any) => sum + Number(tx.total_amount), 0);
 
-  const thisTotal = sumReduce(thisWeekData);
-  const lastTotal = sumReduce(lastWeekData);
+  const thisWeekCount = thisWeekTxs.length;
+  const lastWeekCount = lastWeekTxs.length;
+
+  const thisWeekAvg = thisWeekCount > 0 ? Math.round(thisWeekTotal / thisWeekCount) : 0;
+  const lastWeekAvg = lastWeekCount > 0 ? Math.round(lastWeekTotal / lastWeekCount) : 0;
+
+  const changePercent =
+    lastWeekTotal > 0
+      ? Math.round(((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100)
+      : thisWeekTotal > 0
+      ? 100
+      : 0;
 
   return {
-    thisWeek: {
-      total: thisTotal,
-      count: thisWeekData.length,
-      avgPerTx: thisWeekData.length > 0 ? Math.round(thisTotal / thisWeekData.length) : 0,
-    },
-    lastWeek: {
-      total: lastTotal,
-      count: lastWeekData.length,
-      avgPerTx: lastWeekData.length > 0 ? Math.round(lastTotal / lastWeekData.length) : 0,
-    },
-    changePercent: lastTotal > 0 ? Math.round(((thisTotal - lastTotal) / lastTotal) * 100) : 0,
+    thisWeek: { total: thisWeekTotal, count: thisWeekCount, avgPerTx: thisWeekAvg },
+    lastWeek: { total: lastWeekTotal, count: lastWeekCount, avgPerTx: lastWeekAvg },
+    changePercent,
   };
 }
+
 export interface FullAnalytics {
   topMenuItems: TopMenuItem[];
   hourlyDistribution: HourlyData[];

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import MicButton from '@/components/MicButton';
 import TransactionCard from '@/components/TransactionCard';
 import SuccessAnimation from '@/components/SuccessAnimation';
@@ -11,7 +11,10 @@ import { formatRupiah, mockMenuItems } from '@/lib/mock-data';
 import type { ParsedItem, ParsedTransactionResult, MenuItem } from '@/types';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
-import { getMenuItems, createTransaction, getTodayTotal } from '@/lib/supabase/queries';
+import { getMenuItems, createTransaction, cancelTransaction, getTodayTotal } from '@/lib/supabase/queries';
+import { createMicGate } from '@/lib/voice/mic-gate';
+import { playCueSound } from '@/lib/voice/cue';
+import { createVoiceOrderPipeline, UNDO_WINDOW_MS } from '@/lib/voice/order-policy';
 
 export default function KasirPage() {
   const { store } = useAuth();
@@ -19,19 +22,35 @@ export default function KasirPage() {
   const [transcript, setTranscript] = useState<string | null>(null);
   const [parsedResult, setParsedResult] = useState<ParsedTransactionResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [savedCount, setSavedCount] = useState(0);
+  const [, setSavedCount] = useState(0);
 
   const [todayTotal, setTodayTotal] = useState(0);
   const [todayCount, setTodayCount] = useState(0);
   const [menuItems, setMenuItems] = useState<MenuItem[]>(mockMenuItems);
   const [error, setError] = useState<string | null>(null);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const lastSpeakingTimeRef = useRef<number>(0);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [autoSave, setAutoSave] = useState(false);
+
+  // Voice v2 Settings & Modes
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [isRamai, setIsRamai] = useState(false);
+  const [ramaiPaymentMethod, setRamaiPaymentMethod] = useState<'tunai' | 'qris'>('tunai');
+
+  // Status visual voice
+  const [voiceBanner, setVoiceBanner] = useState<{ message: string; type: 'info' | 'warn' | 'success' } | null>(null);
+
+  // Undo (Batalkan) 8 detik untuk Mode Ramai
+  const [undoTx, setUndoTx] = useState<{
+    id: string;
+    total: number;
+    itemCount: number;
+    paymentMethod: 'tunai' | 'qris';
+    expiresAt: number;
+  } | null>(null);
+  const [undoCountdown, setUndoCountdown] = useState<number>(8);
+
   const [showSuccess, setShowSuccess] = useState(false);
   const [lastSavedAmount, setLastSavedAmount] = useState('');
 
+  // Modals for Normal Mode
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [pendingItems, setPendingItems] = useState<ParsedItem[]>([]);
@@ -44,6 +63,37 @@ export default function KasirPage() {
     createdAt?: string;
   } | null>(null);
 
+  // Mic Gate instance
+  const micGate = useMemo(() => createMicGate(), []);
+
+  // Refs for current states used in callbacks
+  const isRamaiRef = useRef(isRamai);
+  const soundEnabledRef = useRef(soundEnabled);
+  const ramaiPaymentMethodRef = useRef(ramaiPaymentMethod);
+  const menuItemsRef = useRef(menuItems);
+  const storeRef = useRef(store);
+
+  useEffect(() => {
+    isRamaiRef.current = isRamai;
+  }, [isRamai]);
+
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+  }, [soundEnabled]);
+
+  useEffect(() => {
+    ramaiPaymentMethodRef.current = ramaiPaymentMethod;
+  }, [ramaiPaymentMethod]);
+
+  useEffect(() => {
+    menuItemsRef.current = menuItems;
+  }, [menuItems]);
+
+  useEffect(() => {
+    storeRef.current = store;
+  }, [store]);
+
+  // Load data awal kasir
   useEffect(() => {
     async function loadInitialData() {
       if (store) {
@@ -56,7 +106,6 @@ export default function KasirPage() {
           setTodayTotal(stats.total);
           setTodayCount(stats.count);
         } catch {
-          // Fallback to mock data if offline or demo
           setMenuItems(mockMenuItems);
         }
       }
@@ -64,10 +113,194 @@ export default function KasirPage() {
     loadInitialData();
   }, [store]);
 
+  // Timer hitung mundur tombol Batalkan (8 detik)
   useEffect(() => {
-    lastSpeakingTimeRef.current = Date.now();
-  }, [isSpeaking]);
+    if (!undoTx) return;
 
+    const interval = setInterval(() => {
+      const remainingMs = undoTx.expiresAt - Date.now();
+      if (remainingMs <= 0) {
+        setUndoTx(null);
+        clearInterval(interval);
+      } else {
+        setUndoCountdown(Math.ceil(remainingMs / 1000));
+      }
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [undoTx]);
+
+  // Fungsi batalkan transaksi simpan otomatis
+  const handleUndoAutoSave = async () => {
+    if (!undoTx) return;
+    const target = undoTx;
+    setUndoTx(null);
+
+    try {
+      if (storeRef.current && !target.id.startsWith('DEMO-')) {
+        await cancelTransaction(target.id);
+        const stats = await getTodayTotal(storeRef.current.id);
+        setTodayTotal(stats.total);
+        setTodayCount(stats.count);
+      } else {
+        setTodayTotal((prev) => Math.max(0, prev - target.total));
+        setTodayCount((prev) => Math.max(0, prev - 1));
+      }
+
+      toast.success('Transaksi berhasil dibatalkan');
+      setVoiceBanner({ message: 'Transaksi dibatalkan', type: 'info' });
+      setTimeout(() => setVoiceBanner(null), 3500);
+    } catch (err) {
+      console.error('Gagal membatalkan transaksi:', err);
+      toast.error('Gagal membatalkan transaksi');
+    }
+  };
+
+  // Simpan otomatis di Mode Ramai
+  const executeAutoSave = useCallback(
+    async (parsed: ParsedTransactionResult, rawText: string) => {
+      const currentStore = storeRef.current;
+      const method = ramaiPaymentMethodRef.current;
+      let txId = `TRX-${Date.now().toString().slice(-6)}`;
+
+      const itemsToSave = parsed.items.map((item) => ({
+        menu_item_id: item.menu_item_id || null,
+        item_name: item.nama,
+        quantity: item.jumlah,
+        unit_price: item.harga_satuan,
+        subtotal: item.subtotal,
+      }));
+
+      if (currentStore) {
+        try {
+          const tx = await createTransaction(
+            currentStore.id,
+            rawText,
+            parsed.total,
+            itemsToSave,
+            {
+              payment_method: method,
+              status: 'selesai',
+              source: 'ramai',
+              cash_received: null,
+              change_amount: null,
+            }
+          );
+          if (tx?.id) {
+            txId = tx.id;
+          }
+          const stats = await getTodayTotal(currentStore.id);
+          setTodayTotal(stats.total);
+          setTodayCount(stats.count);
+        } catch (err) {
+          console.error('Error auto-saving transaction:', err);
+        }
+      } else {
+        setTodayTotal((prev) => prev + parsed.total);
+        setTodayCount((prev) => prev + 1);
+      }
+
+      setSavedCount((c) => c + 1);
+      setParsedResult(null);
+
+      // Munculkan bar Batalkan selama 8 detik
+      setUndoTx({
+        id: txId,
+        total: parsed.total,
+        itemCount: parsed.items.length,
+        paymentMethod: method,
+        expiresAt: Date.now() + UNDO_WINDOW_MS,
+      });
+      setUndoCountdown(8);
+
+      setVoiceBanner({
+        message: `Tersimpan otomatis: ${formatRupiah(parsed.total)} (${method.toUpperCase()})`,
+        type: 'success',
+      });
+      setTimeout(() => setVoiceBanner(null), 4000);
+
+      // Mainkan chime audio singkat di dalam mic gate
+      await micGate.playAppSound(() => playCueSound('success', soundEnabledRef.current));
+    },
+    [micGate]
+  );
+
+  // Setup Voice Pipeline dengan Deduper 3s & Decision Policy
+  const voicePipeline = useMemo(() => {
+    return createVoiceOrderPipeline({
+      getMode: () => (isRamaiRef.current ? 'ramai' : 'normal'),
+      getMenu: () => (menuItemsRef.current.length > 0 ? menuItemsRef.current : mockMenuItems),
+      extract: async (text: string) => {
+        const targetMenu = menuItemsRef.current.length > 0 ? menuItemsRef.current : mockMenuItems;
+        const res = await fetch('/api/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transcript: text,
+            menuItems: targetMenu.map((m) => ({ nama: m.name, harga: m.price })),
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Gagal mengekstrak data');
+        }
+
+        const data: ParsedTransactionResult = await res.json();
+        return data;
+      },
+      onAutoSave: async (parsed, rawText) => {
+        await executeAutoSave(parsed, rawText);
+      },
+      onDraft: async (parsed, _rawText) => {
+        setParsedResult(parsed);
+        const hasUnreasonable = parsed.items.some((i) => i.jumlah > 20);
+        const hasUnknown = parsed.item_tidak_dikenal && parsed.item_tidak_dikenal.length > 0;
+
+        let msg = 'Pesanan masuk draf untuk ditinjau';
+        if (hasUnreasonable) {
+          msg = 'Jumlah > 20: masuk draf untuk ditinjau';
+        } else if (hasUnknown) {
+          msg = 'Ada item belum dikenal: masuk draf';
+        }
+
+        setVoiceBanner({ message: msg, type: 'info' });
+        setTimeout(() => setVoiceBanner(null), 4000);
+
+        await micGate.playAppSound(() => playCueSound('draft', soundEnabledRef.current));
+      },
+      onDuplicate: async () => {
+        setVoiceBanner({ message: 'Pesanan identik diabaikan', type: 'warn' });
+        setTimeout(() => setVoiceBanner(null), 3000);
+        await micGate.playAppSound(() => playCueSound('duplicate', soundEnabledRef.current));
+      },
+      onIgnored: async () => {
+        setVoiceBanner({ message: 'Tidak ada item menu yang dikenali', type: 'warn' });
+        setTimeout(() => setVoiceBanner(null), 3000);
+      },
+    });
+  }, [executeAutoSave, micGate]);
+
+  // Handler penerima transkrip dari mic
+  const handleTranscript = useCallback(
+    async (text: string) => {
+      setTranscript(text);
+      setIsProcessing(true);
+      setError(null);
+
+      try {
+        await voicePipeline.handleTranscript(text);
+      } catch (err) {
+        console.error(err);
+        setError('Terjadi kesalahan saat memproses suara dengan AI.');
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [voicePipeline]
+  );
+
+  // Penanganan simpan manual dari draf (Mode Normal)
   const handleSave = useCallback((items: ParsedItem[], total: number) => {
     setPendingItems(items);
     setPendingTotal(total);
@@ -95,7 +328,19 @@ export default function KasirPage() {
           subtotal: item.subtotal,
         }));
 
-        const tx = await createTransaction(store.id, currentTranscript, total, itemsToSave);
+        const tx = await createTransaction(
+          store.id,
+          currentTranscript,
+          total,
+          itemsToSave,
+          {
+            payment_method: details.method,
+            status: 'selesai',
+            source: 'normal',
+            cash_received: details.paidAmount,
+            change_amount: details.changeAmount,
+          }
+        );
         if (tx) {
           txId = tx.id ? tx.id.slice(0, 8).toUpperCase() : txId;
           const stats = await getTodayTotal(store.id);
@@ -123,6 +368,7 @@ export default function KasirPage() {
     setIsPaymentModalOpen(false);
     setIsReceiptModalOpen(true);
     toast.success('Pembayaran berhasil diproses!');
+    await micGate.playAppSound(() => playCueSound('success', soundEnabledRef.current));
   };
 
   const handleNewOrder = useCallback(() => {
@@ -133,84 +379,6 @@ export default function KasirPage() {
     setIsReceiptModalOpen(false);
   }, []);
 
-  const handleTranscript = useCallback(
-    async (text: string) => {
-      const timeSinceSpeaking = Date.now() - lastSpeakingTimeRef.current;
-      if (isSpeaking || timeSinceSpeaking < 2500) {
-        return;
-      }
-
-      const lowerText = text.toLowerCase();
-      if (lowerText.includes('berhasil disimpan') || lowerText.includes('rupiah')) {
-        return;
-      }
-
-      setTranscript(text);
-      setIsProcessing(true);
-      setError(null);
-
-      try {
-        const targetMenu = menuItems && menuItems.length > 0 ? menuItems : mockMenuItems;
-        const res = await fetch('/api/extract', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            transcript: text,
-            menuItems: targetMenu.map((m) => ({ nama: m.name, harga: m.price })),
-          }),
-        });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || 'Gagal mengekstrak data');
-        }
-
-        const data: ParsedTransactionResult = await res.json();
-        data.items = data.items.map((item) => {
-          const matchedMenu = targetMenu.find((m) => m.name.toLowerCase() === item.nama.toLowerCase());
-          if (matchedMenu) {
-            return {
-              ...item,
-              nama: matchedMenu.name,
-              harga_satuan: matchedMenu.price,
-              subtotal: item.jumlah * matchedMenu.price,
-              menu_item_id: matchedMenu.id,
-            };
-          }
-          return { ...item, is_custom: true };
-        });
-
-        setParsedResult(data);
-
-        if (voiceEnabled && 'speechSynthesis' in window) {
-          const textMsg =
-            data.items.map((i) => `${i.jumlah} ${i.nama}`).join(', ') +
-            `. Total ${data.total} rupiah. Draf pesanan siap ditinjau.`;
-          const utterance = new SpeechSynthesisUtterance(textMsg);
-          utterance.lang = 'id-ID';
-
-          setIsSpeaking(true);
-          utterance.onstart = () => setIsSpeaking(true);
-          utterance.onend = () => setTimeout(() => setIsSpeaking(false), 500);
-          utterance.onerror = () => setIsSpeaking(false);
-
-          window.speechSynthesis.speak(utterance);
-        }
-
-        // Hasil suara selalu masuk ke draf pesanan untuk konfirmasi tap sebelum bayar
-        setParsedResult(data);
-      } catch (err) {
-        console.error(err);
-        setError('Terjadi kesalahan saat memproses suara dengan AI.');
-      } finally {
-        setIsProcessing(false);
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [menuItems, autoSave, voiceEnabled]
-  );
-
-  // Quick Grid manual tap selection (instant optimistic add to draft)
   const handleSelectMenuItem = useCallback((item: MenuItem) => {
     setParsedResult((prev) => {
       const existingItems = prev ? [...prev.items] : [];
@@ -297,7 +465,7 @@ export default function KasirPage() {
   }, []);
 
   return (
-    <div className="flex flex-col h-full bg-[#FFFBEB] text-[#1C1917]">
+    <div className="flex flex-col h-full bg-[#FFFBEB] text-[#1C1917] relative">
       <SuccessAnimation
         show={showSuccess}
         amount={lastSavedAmount}
@@ -311,7 +479,7 @@ export default function KasirPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-lg md:text-xl font-bold text-[#1C1917]">Kasir Sikasep</h1>
               <span className="text-[10px] font-bold text-[#9A3412] bg-[#FDF6E2] px-2 py-0.5 rounded-full border border-[#E7E0D3]">
-                Hybrid Suara + Sentuh
+                {isRamai ? 'Mode Ramai Aktif' : 'Mode Normal'}
               </span>
             </div>
             <p className="text-xs text-[#57534E] mt-0.5">
@@ -335,18 +503,24 @@ export default function KasirPage() {
               </div>
             </div>
 
-            {/* Quick Settings */}
+            {/* Quick Settings: Saklar Bunyi (SPEC §7.2 pengganti Suara AI) */}
             <div className="flex items-center gap-3">
-              <label className="text-xs font-semibold text-[#57534E] cursor-pointer flex items-center gap-1.5 select-none" title="AI otomatis menyebutkan total pesanan lewat audio kasir">
+              <label
+                className="text-xs font-semibold text-[#57534E] cursor-pointer flex items-center gap-2 select-none min-h-[48px]"
+                title="Bunyi lonceng audio kasir (Suara AI) saat pesanan selesai"
+              >
                 <input
                   type="checkbox"
-                  checked={voiceEnabled}
-                  onChange={(e) => setVoiceEnabled(e.target.checked)}
-                  className="rounded border-[#E7E0D3] text-[#9A3412] focus:ring-[#9A3412]/30"
+                  checked={soundEnabled}
+                  onChange={(e) => setSoundEnabled(e.target.checked)}
+                  className="w-4 h-4 rounded border-[#E7E0D3] text-[#9A3412] focus:ring-[#9A3412]/30 cursor-pointer"
                 />
-                <span className="font-semibold text-[#1C1917]">Suara AI</span>
-                <span className="text-[10px] text-[#78350F] bg-[#FDF6E2] px-2 py-0.5 rounded border border-[#E7E0D3] hidden sm:inline">
-                  Menyebutkan total pesanan
+                <span className="font-semibold text-[#1C1917]">Bunyi</span>
+                <span
+                  className="text-[10px] text-[#78350F] bg-[#FDF6E2] px-2 py-0.5 rounded border border-[#E7E0D3] hidden sm:inline"
+                  title="Notifikasi audio singkat tanpa feedback TTS (pengganti Suara AI)"
+                >
+                  Audio Chime
                 </span>
               </label>
             </div>
@@ -354,8 +528,8 @@ export default function KasirPage() {
         </div>
       </header>
 
-      {/* Main Content Area: Hybrid Grid + Draft Order Card */}
-      <div className="flex-1 overflow-y-auto px-4 py-5 md:px-8 space-y-6 max-w-7xl w-full mx-auto">
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto px-4 py-5 md:px-8 space-y-6 max-w-7xl w-full mx-auto pb-24">
         {/* Mobile Today Stats Bar */}
         <div className="flex sm:hidden items-center justify-around bg-white border border-[#E7E0D3] rounded-xl p-3 shadow-2xs">
           <div className="text-center">
@@ -371,6 +545,30 @@ export default function KasirPage() {
           </div>
         </div>
 
+        {/* Visual Indicator Banner (Voice v2: Masuk Draf, Diabaikan, dsb) */}
+        {voiceBanner && (
+          <div
+            className={`px-4 py-3 rounded-xl border text-xs font-bold animate-fade-in flex items-center justify-between shadow-2xs ${
+              voiceBanner.type === 'success'
+                ? 'bg-[#ECFDF5] border-[#A7F3D0] text-[#065F46]'
+                : voiceBanner.type === 'warn'
+                ? 'bg-[#FFFBEB] border-[#FDE68A] text-[#92400E]'
+                : 'bg-[#EFF6FF] border-[#BFDBFE] text-[#1E40AF]'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
+              <span>{voiceBanner.message}</span>
+            </div>
+            <button
+              onClick={() => setVoiceBanner(null)}
+              className="text-xs font-bold underline hover:no-underline ml-3 cursor-pointer"
+            >
+              Tutup
+            </button>
+          </div>
+        )}
+
         {error && (
           <div className="px-4 py-3 rounded-xl bg-[#FEE2E2] border border-[#FCA5A5] text-[#991B1B] text-xs font-medium animate-fade-in flex items-center justify-between">
             <span>{error}</span>
@@ -383,9 +581,9 @@ export default function KasirPage() {
           </div>
         )}
 
-        {/* 2-Column Responsive Layout on Desktop, Vertical on Mobile */}
+        {/* 2-Column Responsive Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left: Quick Menu Grid (Katalog Cepat) */}
+          {/* Left: Quick Menu Grid */}
           <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm md:text-base font-bold text-[#1C1917]">
@@ -404,7 +602,7 @@ export default function KasirPage() {
 
           {/* Right: Voice Panel & Draft Order Review */}
           <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-5 sticky top-4">
-            {/* 1. Panel Suara AI Kasir (Judul, Status, Tombol Mic, Mode Ramai sejajar & tidak terpotong) */}
+            {/* 1. Panel Suara AI Kasir */}
             <div className="bg-white rounded-2xl border border-[#E7E0D3] p-5 shadow-2xs flex flex-col items-center gap-4">
               <div className="w-full flex items-center justify-between pb-3 border-b border-[#E7E0D3]">
                 <div className="flex items-center gap-2.5">
@@ -426,11 +624,51 @@ export default function KasirPage() {
                 </span>
               </div>
 
-              {/* Status "Tekan untuk bicara", Tombol Mic Besar, dan Mode Ramai */}
+              {/* Saklar Permanen Tunai | QRIS saat Mode Ramai (SPEC §7.1 & §7.2) */}
+              {isRamai && (
+                <div className="w-full bg-[#FDF6E2] p-3 rounded-xl border border-[#E7E0D3] flex flex-col gap-1.5 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#78350F]">Metode Bayar Mode Ramai</span>
+                    <span className="text-[10px] text-[#57534E]">Auto-save</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => setRamaiPaymentMethod('tunai')}
+                      className={`min-h-[48px] rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                        ramaiPaymentMethod === 'tunai'
+                          ? 'bg-[#9A3412] text-[#FFFBEB] border-[#9A3412] shadow-xs'
+                          : 'bg-white text-[#57534E] border-[#E7E0D3] hover:bg-[#FFFBEB]'
+                      }`}
+                    >
+                      Tunai (Uang Pas)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRamaiPaymentMethod('qris')}
+                      className={`min-h-[48px] rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                        ramaiPaymentMethod === 'qris'
+                          ? 'bg-[#9A3412] text-[#FFFBEB] border-[#9A3412] shadow-xs'
+                          : 'bg-white text-[#57534E] border-[#E7E0D3] hover:bg-[#FFFBEB]'
+                      }`}
+                    >
+                      QRIS
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-[#78716C] mt-0.5 text-center leading-tight">
+                    QRIS: penanda metode bayar manual, periksa bukti bayar kasir
+                  </p>
+                </div>
+              )}
+
+              {/* Status Mic & Tombol Mic */}
               <div className="w-full flex flex-col items-center justify-center py-1">
                 <MicButton
                   onTranscript={handleTranscript}
-                  disabled={isProcessing || isSpeaking}
+                  disabled={isProcessing}
+                  micGate={micGate}
+                  isRamai={isRamai}
+                  onToggleRamai={setIsRamai}
                 />
               </div>
             </div>
@@ -451,7 +689,6 @@ export default function KasirPage() {
                 )}
               </div>
 
-              {/* If there is active items in draft */}
               {parsedResult && parsedResult.items.length > 0 ? (
                 <div className="bg-white rounded-2xl border border-[#E7E0D3] p-4 shadow-sm animate-fade-in">
                   <TransactionCard
@@ -497,7 +734,9 @@ export default function KasirPage() {
                   <div>
                     <p className="text-sm font-bold text-[#1C1917]">Draf Masih Kosong</p>
                     <p className="text-xs text-[#57534E] mt-1 max-w-xs leading-relaxed">
-                      Sentuh menu di katalog cepat atau ucapkan pesanan lewat mikrofon di atas untuk mulai mencatat.
+                      {isRamai
+                        ? 'Mode Ramai aktif: ucapkan pesanan untuk auto-save langsung ke sistem.'
+                        : 'Sentuh menu di katalog cepat atau ucapkan pesanan lewat mikrofon di atas untuk mulai mencatat.'}
                     </p>
                   </div>
                 </div>
@@ -507,7 +746,36 @@ export default function KasirPage() {
         </div>
       </div>
 
-      {/* Task 7: Modal Konfirmasi Pembayaran Kasir */}
+      {/* Task 12: Toast Batalkan 8 Detik (SPEC §7.5) */}
+      {undoTx && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4 animate-slide-up">
+          <div className="bg-[#1C1917] text-[#FFFBEB] rounded-2xl p-4 shadow-2xl border border-[#9A3412]/40 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-[#9A3412] text-[#FFFBEB] flex items-center justify-center shrink-0 font-bold tabular-nums">
+                {undoCountdown}s
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white truncate">
+                  Tersimpan Otomatis: {formatRupiah(undoTx.total)}
+                </p>
+                <p className="text-[11px] text-[#D6D3D1] truncate">
+                  {undoTx.itemCount} item ({undoTx.paymentMethod.toUpperCase()})
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleUndoAutoSave}
+              type="button"
+              className="min-h-[48px] px-5 py-2.5 rounded-xl bg-[#B91C1C] hover:bg-[#991B1B] text-[#FFFBEB] text-xs font-bold transition-all shrink-0 cursor-pointer focus-ring shadow-md"
+            >
+              Batalkan
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Pembayaran Kasir (Mode Normal) */}
       <PaymentModal
         isOpen={isPaymentModalOpen}
         items={pendingItems}
@@ -516,7 +784,7 @@ export default function KasirPage() {
         onConfirmPayment={handleConfirmPayment}
       />
 
-      {/* Task 7: Modal Struk Kasir Thermal Plered */}
+      {/* Modal Struk Kasir Thermal Plered */}
       {lastPaymentDetails && (
         <ReceiptModal
           isOpen={isReceiptModalOpen}

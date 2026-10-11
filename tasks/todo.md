@@ -181,3 +181,43 @@
 - `src/app/dashboard/rekap/page.tsx`
 - `src/app/dashboard/insights/page.tsx`
 - `tests/task8-secondary-pages.test.mjs`
+
+---
+
+# Fase 2: Alur Suara v2 (SPEC §7) (COMPLETED)
+
+## Task 9: Logika Murni Mic-Gate & Kebijakan Pesanan Suara (COMPLETED)
+**Acceptance criteria:**
+- [x] Mic dijeda sebelum suara aplikasi diputar dan dilanjutkan setelahnya (juga saat pemutaran gagal); hasil yang tiba saat bersuara dibuang.
+- [x] Mic yang dijeda kasir tidak ikut dinyalakan kembali setelah bunyi selesai.
+- [x] Satu ucapan yang dilaporkan ganda dalam ≤ 3 detik menghasilkan satu transaksi + indikator "Pesanan identik diabaikan".
+- [x] Dua pesanan identik dari pembeli berbeda (> 3 detik) tercatat dua transaksi.
+- [x] Jumlah > 20 di Mode Ramai masuk draf, tidak disimpan otomatis; jumlah 20 tetap disimpan otomatis.
+- [x] Hasil tanpa item dikenal diabaikan; sebagian dikenal masuk draf.
+**Files:** `src/lib/voice/mic-gate.ts`, `src/lib/voice/order-policy.ts`, `tests/voice-flow-v2.test.mjs`
+
+## Task 10: Integrasi Layar Kasir (Hapus TTS, Bunyi Singkat, Saklar Tunai|QRIS) (COMPLETED)
+- [x] TTS pembacaan pesanan & filter teks "rupiah" dihapus dari kasir.
+- [x] Saklar "Bunyi" menggantikan kotak centang "Suara AI".
+- [x] Indikator mic Mode Ramai menyala jelas; 1 ketukan menjeda.
+- [x] Saklar permanen Tunai | QRIS (default Tunai) tampil saat Mode Ramai.
+**Files:** `src/app/dashboard/page.tsx`, `src/components/MicButton.tsx`, `src/lib/voice/cue.ts`
+
+## Task 11: Migrasi 002 & Query (COMPLETED)
+- [x] Kolom `payment_method`, `status`, `source`, `cash_received`, `change_amount`, `updated_at` + kebijakan RLS update.
+- [x] Query `createTransaction` menerima metadata; query `cancelTransaction`, `updateTransaction`, `updateTransactionItems` siap pakai.
+- [x] Omzet harian dan mingguan mengecualikan transaksi berstatus `dibatalkan`.
+**Files:** `supabase/migrations/002_voice_flow_v2.sql`, `src/lib/supabase/queries.ts`, `src/lib/supabase/analytics.ts`
+
+## Task 12: Simpan Otomatis Mode Ramai + "Batalkan" 8 Detik (COMPLETED)
+- [x] Transaksi Mode Ramai tersimpan tanpa uang diterima/kembalian dan tanpa struk otomatis.
+- [x] Tombol "Batalkan" (≥ 48px) tampil 8 detik; menekan = status `dibatalkan`.
+- [x] Indikator visual real-time ("Tersimpan otomatis", "Pesanan identik diabaikan", dsb).
+**Files:** `src/app/dashboard/page.tsx`
+
+## Task 13: Kelola Transaksi dari Riwayat (COMPLETED)
+- [x] Batal, edit item, ubah metode bayar (mengisi `updated_at`), cetak struk.
+- [x] Omzet, riwayat ringkasan, dan rekap mengecualikan status `dibatalkan`.
+- [x] Transaksi dibatalkan ditampilkan dengan badge "Dibatalkan" dan teks tercoret.
+**Files:** `src/app/dashboard/riwayat/page.tsx`
+

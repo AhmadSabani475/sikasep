@@ -1,7 +1,7 @@
 # Technical Specification: Sikasep (Sistem Kasir Suara Enterpreneur Purwakarta)
 > **Dokumen ID:** `SPEC-sikasep`  
 > **Status:** Draft Ready for Implementation  
-> **Versi:** 1.0.0  
+> **Versi:** 1.1.0 (tambahan §7: Alur Suara v2 — Mode Normal & Mode Ramai)  
 > **Target Framework:** Next.js 16 (App Router) + React 19 + Tailwind CSS v4 + Supabase + Google Gemini (`@google/genai`)
 
 ---
@@ -206,3 +206,85 @@ export interface TransactionPayload {
 * **Kontras Teks**: Seluruh teks judul dan angka memenuhi standar rasio kontras > 4.5:1 terhadap background masing-masing.
 * **Focus Visible**: Setiap elemen interaktif memiliki `ring-2 ring-primary ring-offset-2` yang tampak jelas saat dikontrol via keyboard.
 * **Audio Feedback**: Dilengkapi indikator visual yang jelas (bukan hanya bunyi "bip") sehingga kasir tuna rungu atau di lingkungan bising tetap tahu mikrofon sedang aktif.
+
+---
+
+## 7. Alur Suara v2 (Mode Normal & Mode Ramai)
+
+> Menggantikan perilaku suara lama. Sumber keputusan: wawancara intent 11 Okt 2026.
+
+### 7.1 Dua Mode
+
+| | Mode Normal | Mode Ramai |
+| :--- | :--- | :--- |
+| Alur | Mic → ucap → tinjau draf → 1 ketukan ke modal pembayaran | Ucap → simpan otomatis (jika lolos aturan §7.3) |
+| Modal pembayaran | Tetap ada; "Uang Pas" = jalan pintas | Dilewati |
+| Metode bayar | Dipilih di modal (Tunai/QRIS) | Saklar permanen **Tunai \| QRIS** di layar kasir, default Tunai |
+| Uang diterima & kembalian | Disimpan | **Tidak disimpan** (`cash_received` dan `change_amount` = `null`) |
+| Struk | Otomatis setelah bayar | **Tidak otomatis**; dicetak belakangan dari Riwayat |
+| Mic | Sekali dengar per ketukan | Terus mendengar; indikator menyala jelas; **1 ketukan untuk menjeda** |
+
+### 7.2 Mikrofon & Suara Aplikasi
+
+* **Mic wajib berhenti (pause) selama aplikasi mengeluarkan suara apa pun**, lalu dilanjutkan setelah suara selesai (termasuk saat pemutaran gagal). Hasil pengenalan yang tiba saat aplikasi bersuara dibuang.
+* **Dilarang** mengandalkan penyaringan isi teks (mis. kata "rupiah") sebagai pengaman echo.
+* Pembacaan ulang pesanan oleh AI (TTS) **dihapus**. Diganti **bunyi singkat** dan **indikator visual** (status mic, "Tersimpan", "Masuk draf", "Pesanan identik diabaikan").
+* Kotak centang "Suara AI" diganti **satu saklar "Bunyi"** (nyala/mati) untuk bunyi singkat. Indikator visual selalu tampil.
+
+### 7.3 Aturan Keputusan Hasil Suara
+
+Diterapkan pada hasil ekstraksi `/api/extract`. Item disebut **dikenal** bila namanya cocok (tanpa beda huruf besar/kecil) dengan menu aktif.
+
+1. **Tidak ada satu pun item dikenal** → **diabaikan** (tidak membuat draf, tidak menyimpan). Tampilkan indikator singkat.
+2. **Mode Normal** → setiap hasil yang punya ≥1 item dikenal **masuk draf**.
+3. **Mode Ramai** → **simpan otomatis hanya jika** semua item dikenal, `item_tidak_dikenal` kosong, **dan** semua jumlah 1–20. Selain itu **masuk draf** untuk ditinjau:
+   * ada item tak dikenal/ambigu bersama item dikenal (sebagian dikenal),
+   * ada jumlah **> 20** (`MAX_REASONABLE_QTY = 20`).
+
+### 7.4 Anti-Transaksi Ganda
+
+* Recognizer bisa melaporkan **satu ucapan lebih dari sekali**. Hasil dengan transkrip sama (dinormalisasi: huruf kecil, spasi dirapikan) yang tiba **≤ 3 detik** (`DUPLICATE_WINDOW_MS = 3000`) setelah hasil sebelumnya **diabaikan**, dan tampil indikator **"Pesanan identik diabaikan"**.
+* Pesanan identik dari **pembeli berbeda** (tiba > 3 detik) **tetap dicatat sebagai transaksi terpisah**. Tidak ada deduplikasi berbasis isi pada jendela panjang.
+
+### 7.5 Batalkan Setelah Simpan Otomatis
+
+* Setelah simpan otomatis, tampil tombol **"Batalkan"** selama **8 detik** (`UNDO_WINDOW_MS = 8000`), target sentuh ≥ 48px.
+* Menekan "Batalkan" menandai transaksi berstatus **`dibatalkan`** (tidak dihapus).
+
+### 7.6 Kelola Transaksi dari Riwayat
+
+* **Batalkan**: ubah `status` menjadi `dibatalkan`; transaksi dibatalkan **tidak dihitung** di omzet/rekap, tetap tampil di Riwayat dengan penanda.
+* **Edit item**: ubah jumlah/hapus/tambah item; total dihitung ulang; `updated_at` diisi waktu perubahan.
+* **Ubah metode bayar**: Tunai ↔ QRIS; `updated_at` diisi.
+* **Cetak struk**: tersedia untuk semua transaksi berstatus `selesai`.
+
+### 7.7 Pembayaran QRIS
+
+* **QRIS hanya penanda metode bayar, tidak terverifikasi.** Sikasep tidak terintegrasi dengan payment gateway. Kasir wajib memeriksa notifikasi pembayaran QRIS secara manual.
+
+### 7.8 Perubahan Data (migrasi `002_voice_flow_v2.sql`)
+
+Kolom baru di `transactions`:
+
+| Kolom | Tipe | Default | Keterangan |
+| :--- | :--- | :--- | :--- |
+| `payment_method` | `text` check `('tunai','qris')` | `'tunai'` | Penanda metode |
+| `status` | `text` check `('selesai','dibatalkan')` | `'selesai'` | Batal = ubah status |
+| `source` | `text` check `('normal','ramai','manual')` | `'normal'` | Asal transaksi |
+| `cash_received` | `numeric` null | `null` | Selalu `null` untuk Mode Ramai & QRIS |
+| `change_amount` | `numeric` null | `null` | Selalu `null` untuk Mode Ramai & QRIS |
+| `updated_at` | `timestamptz` null | `null` | Diisi saat edit/batal/ubah metode |
+
+Kebijakan RLS baru: `update` pada `transactions`; `update`/`delete`/`insert` pada `transaction_items` milik toko sendiri.
+
+### 7.9 Konstanta & Modul
+
+* `src/lib/voice/mic-gate.ts` — menjeda recognizer selama suara aplikasi.
+* `src/lib/voice/order-policy.ts` — `decideVoiceOrder`, `createUtteranceDeduper`, `createVoiceOrderPipeline`, konstanta `UNDO_WINDOW_MS`, `DUPLICATE_WINDOW_MS`, `MAX_REASONABLE_QTY`.
+
+### 7.10 Di Luar Cakupan
+
+* Verifikasi QRIS / integrasi payment gateway.
+* Struk otomatis & hitung kembalian di Mode Ramai.
+* Feedback suara apa pun selain bunyi singkat.
+* Penyaringan teks sebagai pengaman echo.

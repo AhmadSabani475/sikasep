@@ -133,21 +133,34 @@ Aturan Penting:
   try {
     const ai = new GoogleGenAI({ apiKey });
 
-    // Gunakan timeout 2500ms agar transaksi kasir tidak pernah menggantung lama
-    const aiCall = ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `Teks ucapan kasir: "${transcript}"`,
-      config: {
-        systemInstruction: systemPrompt,
-        responseMimeType: 'application/json',
-      },
-    });
+    // Gunakan model aktif gemini-3.1-flash-lite dengan fallback gemini-3.8-flash
+    const callAI = async () => {
+      try {
+        return await ai.models.generateContent({
+          model: 'gemini-3.1-flash-lite',
+          contents: `Teks ucapan kasir: "${transcript}"`,
+          config: {
+            systemInstruction: systemPrompt,
+            responseMimeType: 'application/json',
+          },
+        });
+      } catch {
+        return await ai.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: `Teks ucapan kasir: "${transcript}"`,
+          config: {
+            systemInstruction: systemPrompt,
+            responseMimeType: 'application/json',
+          },
+        });
+      }
+    };
 
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('AI request timeout (2500ms)')), 2500)
+      setTimeout(() => reject(new Error('AI request timeout (8000ms)')), 8000)
     );
 
-    const response = await Promise.race([aiCall, timeoutPromise]);
+    const response = await Promise.race([callAI(), timeoutPromise]);
     const responseText = response?.text;
 
     if (!responseText) {

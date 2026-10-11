@@ -19,7 +19,13 @@ export interface Transaction {
   store_id: string;
   raw_transcript: string | null;
   total_amount: number;
+  payment_method?: 'tunai' | 'qris';
+  status?: 'selesai' | 'dibatalkan';
+  source?: 'normal' | 'ramai' | 'manual';
+  cash_received?: number | null;
+  change_amount?: number | null;
   created_at: string;
+  updated_at?: string | null;
   items?: TransactionItem[];
 }
 
