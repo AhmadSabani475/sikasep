@@ -37,57 +37,51 @@ export default function TransactionCard({
 
   const updateItem = useCallback(
     (index: number, field: keyof ParsedItem, value: string | number) => {
-      setItems((prev) => {
-        const updated = [...prev];
-        const item = { ...updated[index] };
+      const updated = [...items];
+      const item = { ...updated[index] };
 
-        if (field === 'jumlah') {
-          const qty = Math.max(1, Number(value));
-          item.jumlah = qty;
-          item.subtotal = qty * item.harga_satuan;
-        } else if (field === 'harga_satuan') {
-          const price = Math.max(0, Number(value));
-          item.harga_satuan = price;
-          item.subtotal = item.jumlah * price;
-        } else if (field === 'nama') {
-          item.nama = String(value);
-        }
+      if (field === 'jumlah') {
+        const qty = Math.max(1, Number(value));
+        item.jumlah = qty;
+        item.subtotal = qty * item.harga_satuan;
+      } else if (field === 'harga_satuan') {
+        const price = Math.max(0, Number(value));
+        item.harga_satuan = price;
+        item.subtotal = item.jumlah * price;
+      } else if (field === 'nama') {
+        item.nama = String(value);
+      }
 
-        updated[index] = item;
-        onItemsChange?.(updated);
-        return updated;
-      });
+      updated[index] = item;
+      setItems(updated);
+      onItemsChange?.(updated);
     },
-    [onItemsChange]
+    [items, onItemsChange]
   );
 
   const removeItem = useCallback(
     (index: number) => {
-      setItems((prev) => {
-        const updated = prev.filter((_, i) => i !== index);
-        onItemsChange?.(updated);
-        return updated;
-      });
+      const updated = items.filter((_, i) => i !== index);
+      setItems(updated);
+      onItemsChange?.(updated);
     },
-    [onItemsChange]
+    [items, onItemsChange]
   );
 
   const addItem = useCallback(() => {
-    setItems((prev) => {
-      const updated = [
-        ...prev,
-        {
-          nama: '',
-          jumlah: 1,
-          harga_satuan: 0,
-          subtotal: 0,
-          is_custom: true,
-        },
-      ];
-      onItemsChange?.(updated);
-      return updated;
-    });
-  }, [onItemsChange]);
+    const updated = [
+      ...items,
+      {
+        nama: '',
+        jumlah: 1,
+        harga_satuan: 0,
+        subtotal: 0,
+        is_custom: true,
+      },
+    ];
+    setItems(updated);
+    onItemsChange?.(updated);
+  }, [items, onItemsChange]);
 
   return (
     <div className="bg-white rounded-2xl border border-[#E7E0D3] overflow-hidden shadow-2xs">
@@ -257,17 +251,25 @@ export default function TransactionCard({
         </button>
       </div>
 
-      {/* Footer Total & Aksi Konfirmasi */}
-      <div className="px-5 py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#FDF6E2]/30 border-t border-[#E7E0D3]">
-        <div>
-          <p className="text-xs font-semibold text-[#57534E]">Total Pembayaran</p>
-          <p className="text-xl font-extrabold text-[#9A3412] tabular-nums">{formatRupiah(calculatedTotal)}</p>
+      {/* Footer Total & Aksi Konfirmasi (Susunan 2 Tingkat - Anti Kepotong) */}
+      <div className="px-5 py-4 flex flex-col gap-3.5 bg-[#FDF6E2]/40 border-t border-[#E7E0D3]">
+        {/* Tingkat 1: Total Pembayaran Jelas & Rapi */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-[#57534E]">Total Pembayaran</p>
+            <p className="text-[11px] text-[#78716C]">{items.length} item di pesanan</p>
+          </div>
+          <p className="text-xl md:text-2xl font-extrabold text-[#9A3412] tabular-nums tracking-tight">
+            {formatRupiah(calculatedTotal)}
+          </p>
         </div>
-        <div className="flex gap-2">
+
+        {/* Tingkat 2: Tombol Aksi Lapang & Proporsional */}
+        <div className="flex items-center gap-2.5">
           <button
             onClick={onCancel}
             type="button"
-            className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl border border-[#E7E0D3] bg-white text-sm font-semibold text-[#57534E] hover:bg-[#FDF6E2] hover:text-[#1C1917] transition-all min-h-[48px] flex items-center justify-center cursor-pointer"
+            className="px-4 py-2.5 rounded-xl border border-[#E7E0D3] bg-white text-sm font-semibold text-[#57534E] hover:bg-[#FDF6E2] hover:text-[#1C1917] transition-all min-h-[48px] flex items-center justify-center cursor-pointer shrink-0"
           >
             Batal
           </button>
@@ -275,7 +277,7 @@ export default function TransactionCard({
             onClick={() => onSave(items.filter((i) => i.nama.trim()), calculatedTotal)}
             disabled={items.filter((i) => i.nama.trim()).length === 0}
             type="button"
-            className="flex-1 sm:flex-initial px-6 py-2.5 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] active:bg-[#6c2710] text-[#FFFBEB] text-sm font-bold shadow-sm hover:shadow transition-all disabled:opacity-40 disabled:cursor-not-allowed min-h-[48px] flex items-center justify-center cursor-pointer"
+            className="flex-1 px-5 py-2.5 rounded-xl bg-[#9A3412] hover:bg-[#7C2D12] active:bg-[#6c2710] text-[#FFFBEB] text-sm font-bold shadow-xs hover:shadow transition-all disabled:opacity-40 disabled:cursor-not-allowed min-h-[48px] flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
           >
             Simpan Transaksi
           </button>

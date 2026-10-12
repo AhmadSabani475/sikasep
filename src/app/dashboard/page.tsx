@@ -621,7 +621,7 @@ export default function KasirPage() {
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-[#1C1917]">Panel Suara Kasir</h3>
-                    <p className="text-[11px] text-[#57534E]">Bicara pesanan sekaligus (ID/Sunda)</p>
+                    <p className="text-[11px] text-[#57534E]">Bicara pesanan sekaligus</p>
                   </div>
                 </div>
 
@@ -696,7 +696,7 @@ export default function KasirPage() {
               </div>
 
               {parsedResult && parsedResult.items.length > 0 ? (
-                <div className="bg-white rounded-2xl border border-[#E7E0D3] p-4 shadow-sm animate-fade-in">
+                <div className="animate-fade-in">
                   <TransactionCard
                     items={parsedResult.items}
                     total={parsedResult.total}

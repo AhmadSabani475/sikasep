@@ -124,11 +124,19 @@ Aturan Penting:
 1. Pahami dialek Sunda Purwakarta dan campuran Indonesia:
    - Angka Sunda: "hiji" = 1, "dua" = 2, "tilu" = 3, "opat" = 4, "lima" = 5, "genep" = 6, "tujuh" = 7, "dalapan" = 8, "salapan" = 9, "sapuluh" = 10.
    - Satuan: "seporsi" / "saporsi" = 1, "segelas" / "sacangkir" = 1, "sapasang" = 2, "sebungkus" = 1.
-   - Kuliner Purwakarta: "maranggi" -> Sate Maranggi, "simping", "peuyeum", "es kalapa" -> Es Kelapa, "cai herang" / "cai" -> Air Mineral.
+   - Kuliner Purwakarta: "maranggi" -> Sate Maranggi, "simping", "peuyeum", "es kalapa" -> Es Kelapa, "cai herang" / "cai" -> Air Mineral, "sop" / "sop iga" -> Sop Iga (atau menu sop yang ada di daftar menu).
 2. Harga HARUS diambil persis dari daftar menu toko. JANGAN mengarang harga.
 3. subtotal = jumlah × harga_satuan.
 4. total = jumlah total semua subtotal.
-5. Jika jumlah tidak disebutkan eksplisit, gunakan 1.`;
+5. Jika jumlah tidak disebutkan eksplisit, gunakan 1.
+6. PENTING - SATU UCAPAN BISA MEMUAT BANYAK ITEM SEKALIGUS:
+   Kasir sering menyebutkan beberapa item menu berturut-turut tanpa tanda baca koma dan tanpa kata "dan".
+   Contoh: "Sop Iga 2 Sate Maranggi 2" BERARTI ada 2 item berbeda:
+   - Item 1: "Sop Iga", jumlah: 2
+   - Item 2: "Sate Maranggi", jumlah: 2
+   Ekstrak SELURUH item yang disebutkan ke dalam array "items". JANGAN HANYA MENGAMBIL 1 ITEM!
+7. Posisi kuantitas:
+   Angka/kuantitas bisa berada setelah nama item ("Sop Iga 2", "Sate Maranggi dua") ATAU sebelum nama item ("2 Sop Iga", "dua Sate Maranggi").`;
 
   try {
     const ai = new GoogleGenAI({ apiKey });
