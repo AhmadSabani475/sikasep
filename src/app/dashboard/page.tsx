@@ -7,7 +7,7 @@ import SuccessAnimation from '@/components/SuccessAnimation';
 import QuickMenuGrid from '@/components/QuickMenuGrid';
 import PaymentModal from '@/components/PaymentModal';
 import ReceiptModal from '@/components/ReceiptModal';
-import { formatRupiah, mockMenuItems } from '@/lib/mock-data';
+import { formatRupiah } from '@/lib/mock-data';
 import type { ParsedItem, ParsedTransactionResult, MenuItem } from '@/types';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
@@ -26,7 +26,8 @@ export default function KasirPage() {
 
   const [todayTotal, setTodayTotal] = useState(0);
   const [todayCount, setTodayCount] = useState(0);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(mockMenuItems);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [isLoadingMenu, setIsLoadingMenu] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Voice v2 Settings & Modes
@@ -102,12 +103,16 @@ export default function KasirPage() {
             getMenuItems(store.id),
             getTodayTotal(store.id),
           ]);
-          setMenuItems(items.length > 0 ? items : mockMenuItems);
+          setMenuItems(items);
           setTodayTotal(stats.total);
           setTodayCount(stats.count);
         } catch {
-          setMenuItems(mockMenuItems);
+          setMenuItems([]);
+        } finally {
+          setIsLoadingMenu(false);
         }
+      } else {
+        setIsLoadingMenu(false);
       }
     }
     loadInitialData();
@@ -229,9 +234,9 @@ export default function KasirPage() {
   const voicePipeline = useMemo(() => {
     return createVoiceOrderPipeline({
       getMode: () => (isRamaiRef.current ? 'ramai' : 'normal'),
-      getMenu: () => (menuItemsRef.current.length > 0 ? menuItemsRef.current : mockMenuItems),
+      getMenu: () => menuItemsRef.current,
       extract: async (text: string) => {
-        const targetMenu = menuItemsRef.current.length > 0 ? menuItemsRef.current : mockMenuItems;
+        const targetMenu = menuItemsRef.current;
         const res = await fetch('/api/extract', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -597,6 +602,7 @@ export default function KasirPage() {
             <QuickMenuGrid
               items={menuItems}
               onSelectItem={handleSelectMenuItem}
+              isLoading={isLoadingMenu}
             />
           </div>
 
