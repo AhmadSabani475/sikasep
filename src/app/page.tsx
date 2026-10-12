@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RerengKendiPattern } from '@/components/RerengKendiPattern';
+import { KendiIcon } from '@/components/icons/PurwakartaIcons';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -38,23 +39,8 @@ export default function LandingPage() {
       <header className="relative z-10 flex items-center justify-between px-6 py-5 md:px-12 border-b border-[#E7E0D3]/80 bg-[#FFFBEB]/90 backdrop-blur-sm">
         <div className="flex items-center gap-3">
           {/* Logo Simbol Kendi Air Plered */}
-          <div className="w-10 h-10 rounded-xl bg-[#9A3412] flex items-center justify-center shadow-sm">
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M12 2v2" />
-              <path d="M10 4h4" />
-              <path d="M9 7h6" />
-              <path d="M8 10c0 4.5 1.5 9 4 11 2.5-2 4-6.5 4-11a5 5 0 0 0-8 0Z" />
-            </svg>
+          <div className="w-10 h-10 rounded-xl bg-[#9A3412] flex items-center justify-center shadow-sm text-white">
+            <KendiIcon size={22} strokeWidth={2} />
           </div>
           <div>
             <span className="text-xl font-bold tracking-tight text-[#1C1917] block leading-none">

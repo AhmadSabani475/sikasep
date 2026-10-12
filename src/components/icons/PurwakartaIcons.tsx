@@ -33,16 +33,10 @@ export function KendiIcon({
       aria-label={ariaLabel}
       {...props}
     >
-      {/* Tutup & Leher Kendi */}
-      <path d="M10 2h4" />
-      <path d="M11 2v3" />
-      <path d="M13 2v3" />
-      <path d="M9 5h6" />
-      <path d="M10 5v3c-3 1.5-5 4-5 7.5a6.5 6.5 0 0 0 13 0c0-3.5-2-6-5-7.5V5" />
-      {/* Cerat / Corong Kendi Plered */}
-      <path d="M5.5 12.5C4 12 3 10.5 3 9c1.5 0 3 1 4 2" />
-      {/* Dasar Kendi */}
-      <path d="M9 22h6" />
+      <path d="M12 2v2" />
+      <path d="M10 4h4" />
+      <path d="M9 7h6" />
+      <path d="M8 10c0 4.5 1.5 9 4 11 2.5-2 4-6.5 4-11a5 5 0 0 0-8 0Z" />
     </svg>
   );
 }

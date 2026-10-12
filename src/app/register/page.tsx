@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { RerengKendiPattern } from '@/components/RerengKendiPattern';
+import { KendiIcon } from '@/components/icons/PurwakartaIcons';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -56,22 +57,8 @@ export default function RegisterPage() {
         {/* Logo & Header Form */}
         <div className="flex flex-col items-center mb-8">
           <Link href="/" className="flex items-center gap-3 mb-2 group">
-            <div className="w-10 h-10 rounded-xl bg-[#9A3412] flex items-center justify-center shadow-xs group-hover:bg-[#7C2D12] transition-colors">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#FFFBEB"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" x2="12" y1="19" y2="22" />
-              </svg>
+            <div className="w-10 h-10 rounded-xl bg-[#9A3412] flex items-center justify-center shadow-xs group-hover:bg-[#7C2D12] transition-colors text-white">
+              <KendiIcon size={22} strokeWidth={2} />
             </div>
             <span className="text-2xl font-bold tracking-tight text-[#1C1917]">
               Sikasep

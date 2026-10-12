@@ -67,8 +67,8 @@ export default function Sidebar() {
     <aside className="hidden md:flex flex-col w-64 bg-white border-r border-[#E7E0D3] shadow-xs select-none">
       {/* Header Logo & Identitas Juragan Purwakarta */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-[#E7E0D3]">
-        <div className="w-10 h-10 rounded-xl bg-[#9A3412] flex items-center justify-center shadow-xs text-[#FFFBEB]">
-          <KendiIcon size={22} strokeWidth={2.2} />
+        <div className="w-10 h-10 rounded-xl bg-[#9A3412] flex items-center justify-center shadow-sm text-white">
+          <KendiIcon size={22} strokeWidth={2} />
         </div>
         <div className="overflow-hidden">
           <div className="flex items-center gap-1.5">
