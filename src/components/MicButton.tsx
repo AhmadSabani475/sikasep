@@ -124,6 +124,8 @@ export default function MicButton({
     recognition.lang = 'id-ID';
 
     recognition.onstart = () => {
+      // Abaikan event dari sesi lama yang sudah digantikan
+      if (recognitionRef.current !== recognition) return;
       setStatus('recording');
       setInterimText('');
       startAudioVisualization();
@@ -131,6 +133,7 @@ export default function MicButton({
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
+      if (recognitionRef.current !== recognition) return;
       // Echo defense: buang hasil jika suara aplikasi sedang diputar
       if (micGate && !micGate.acceptsResult()) {
         return;
@@ -162,6 +165,7 @@ export default function MicButton({
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (recognitionRef.current !== recognition) return;
       // Abaikan error 'aborted' karena dipicu secara sengaja saat mic dijeda/dihentikan
       if (event.error === 'aborted') {
         return;
@@ -179,13 +183,24 @@ export default function MicButton({
     };
 
     recognition.onend = () => {
+      // Sesi lama yang sudah digantikan tidak boleh mengubah status sesi yang sedang berjalan
+      if (recognitionRef.current !== recognition) return;
+      const mutedByAppSound = isAppSoundMutedRef.current;
       stopAudioVisualization();
-      micGate?.setListening(false);
       recognitionRef.current = null;
-      
-      if (continuousModeRef.current && !isRamaiPausedRef.current && !isAppSoundMutedRef.current) {
+      // Saat dimatikan sementara oleh MicGate, niat kasir tetap "mendengarkan":
+      // jangan laporkan listening=false agar MicGate menyalakan ulang setelah bunyi.
+      if (mutedByAppSound) return;
+
+      micGate?.setListening(false);
+      if (continuousModeRef.current && !isRamaiPausedRef.current) {
         setTimeout(() => {
-          if (continuousModeRef.current && !isRamaiPausedRef.current && !isAppSoundMutedRef.current) {
+          if (
+            continuousModeRef.current &&
+            !isRamaiPausedRef.current &&
+            !isAppSoundMutedRef.current &&
+            !recognitionRef.current
+          ) {
             startRecordingRef.current();
           }
         }, 300);
@@ -195,11 +210,12 @@ export default function MicButton({
       }
     };
 
+    recognitionRef.current = recognition;
     try {
       recognition.start();
-      recognitionRef.current = recognition;
     } catch (e) {
       console.error('Failed to start recognition:', e);
+      recognitionRef.current = null;
       setStatus('error');
       micGate?.setListening(false);
     }
@@ -217,10 +233,12 @@ export default function MicButton({
       } catch {
         // ignore
       }
-      setStatus('idle');
-      stopAudioVisualization();
-      micGate?.setListening(false);
     }
+    // Selalu laporkan ke MicGate, termasuk saat sesi sedang dimatikan sementara oleh bunyi,
+    // agar MicGate tidak menyalakan ulang mic yang dijeda kasir.
+    setStatus('idle');
+    stopAudioVisualization();
+    micGate?.setListening(false);
   }, [stopAudioVisualization, micGate]);
 
   // Daftarkan controller ke MicGate untuk menjeda saat suara aplikasi diputar
@@ -240,9 +258,12 @@ export default function MicButton({
         },
         resume: () => {
           isAppSoundMutedRef.current = false;
-          if (continuousModeRef.current && !isRamaiPausedRef.current) {
-            startRecordingRef.current();
+          if (!continuousModeRef.current || isRamaiPausedRef.current) return;
+          if (recognitionRef.current) {
+            // Sesi yang di-abort belum selesai berakhir: onend-nya akan menyalakan ulang.
+            return;
           }
+          startRecordingRef.current();
         },
       });
     }
@@ -254,7 +275,8 @@ export default function MicButton({
 
     if (supported && continuousMode) {
       const timer = setTimeout(() => {
-        if (!isRamaiPausedRef.current) {
+        // Jangan ganti sesi yang sudah dibuat (mis. oleh tombol saklar Mode Ramai)
+        if (!isRamaiPausedRef.current && !recognitionRef.current) {
           try {
             startRecording();
           } catch (e) {

@@ -3,7 +3,6 @@
 import { useState, useMemo } from 'react';
 import type { MenuItem } from '@/types';
 import { formatRupiah } from '@/lib/mock-data';
-import { AngloIcon, KendiIcon, FoodTrayIcon } from '@/components/icons/PurwakartaIcons';
 
 interface QuickMenuGridProps {
   items: MenuItem[];
@@ -17,24 +16,12 @@ export function QuickMenuGrid({
   className = '',
 }: QuickMenuGridProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'semua' | 'makanan' | 'minuman' | 'camilan'>('semua');
 
-  // Filter items based on active status, category, and search query
+  // Filter items based on active status and search query
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
       // Must be active if status exists
       if (item.is_active === false) return false;
-
-      // Filter by category heuristic based on name if no explicit category
-      if (selectedCategory !== 'semua') {
-        const lowerName = item.name.toLowerCase();
-        const isMinuman = lowerName.includes('es ') || lowerName.includes('teh') || lowerName.includes('kopi') || lowerName.includes('jus') || lowerName.includes('air');
-        const isCamilan = lowerName.includes('simping') || lowerName.includes('peuyeum') || lowerName.includes('colenak') || lowerName.includes('keripik');
-        
-        if (selectedCategory === 'minuman' && !isMinuman) return false;
-        if (selectedCategory === 'camilan' && !isCamilan) return false;
-        if (selectedCategory === 'makanan' && (isMinuman || isCamilan)) return false;
-      }
 
       // Filter by search query
       if (searchQuery.trim()) {
@@ -43,77 +30,46 @@ export function QuickMenuGrid({
 
       return true;
     });
-  }, [items, selectedCategory, searchQuery]);
+  }, [items, searchQuery]);
 
   return (
-    <div className={`flex flex-col gap-3 ${className}`}>
-      {/* Search & Filter Toolbar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-        {/* Search Input */}
-        <div className="relative flex-1">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari menu (misal: Sate Maranggi, Es Kelapa)..."
-            className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-white border border-[#E7E0D3] text-[#1C1917] placeholder:text-[#57534E] text-xs md:text-sm focus:outline-none focus:border-[#9A3412] focus:ring-2 focus:ring-[#9A3412]/20 transition-all shadow-2xs"
-          />
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-[#57534E]"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
+    <div className={`flex flex-col gap-3.5 ${className}`}>
+      {/* Search Toolbar */}
+      <div className="relative w-full">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Cari menu (misal: Sate Maranggi, Es Kelapa)..."
+          className="w-full pl-10 pr-10 py-2.5 min-h-[48px] rounded-xl bg-white border border-[#E7E0D3] text-[#1C1917] placeholder:text-[#57534E] text-xs md:text-sm focus:outline-none focus:border-[#9A3412] focus:ring-2 focus:ring-[#9A3412]/20 transition-all shadow-2xs"
+        />
+        <svg
+          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#57534E]"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-1 top-1/2 -translate-y-1/2 text-[#57534E] hover:text-[#1C1917] min-h-[48px] min-w-[48px] flex items-center justify-center cursor-pointer"
+            aria-label="Hapus pencarian"
           >
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#57534E] hover:text-[#1C1917] text-xs p-1"
-              aria-label="Hapus pencarian"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          )}
-        </div>
-
-        {/* Category Pills with Purwakarta Cultural Icons */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          {(
-            [
-              { id: 'semua', label: 'Semua', icon: null },
-              { id: 'makanan', label: 'Makanan', icon: <AngloIcon size={15} strokeWidth={2} /> },
-              { id: 'minuman', label: 'Minuman', icon: <KendiIcon size={15} strokeWidth={2} /> },
-              { id: 'camilan', label: 'Oleh-oleh', icon: <FoodTrayIcon size={15} strokeWidth={2} /> },
-            ] as const
-          ).map((cat) => {
-            const isActive = selectedCategory === cat.id;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all min-h-[48px] flex items-center justify-center gap-1.5 cursor-pointer ${
-                  isActive
-                    ? 'bg-[#9A3412] text-[#FFFBEB] shadow-2xs'
-                    : 'bg-white text-[#57534E] border border-[#E7E0D3] hover:bg-[#FDF6E2] hover:text-[#1C1917]'
-                }`}
-              >
-                {cat.icon}
-                <span>{cat.label}</span>
-              </button>
-            );
-          })}
-        </div>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Grid Menu Terlaris (2 Kolom di Ponsel, 3-4 di Desktop) */}
@@ -134,7 +90,7 @@ export function QuickMenuGrid({
           </svg>
           <p className="text-sm font-semibold text-[#1C1917]">Menu Tidak Ditemukan</p>
           <p className="text-xs text-[#57534E] mt-1">
-            Ucapkan nama menu via mikrofon di bawah atau sesuaikan kata kunci pencarian.
+            Ucapkan nama menu via mikrofon di samping atau sesuaikan kata kunci pencarian.
           </p>
         </div>
       ) : (
@@ -160,7 +116,7 @@ export function QuickMenuGrid({
                 </span>
                 <span className="w-6 h-6 rounded-full bg-[#FDF6E2] text-[#9A3412] group-hover:bg-[#9A3412] group-hover:text-[#FFFBEB] flex items-center justify-center transition-all text-xs font-bold">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="12" cy="5" x2="12" y2="19" />
                     <line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
                 </span>

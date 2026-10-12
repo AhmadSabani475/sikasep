@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" fill="none">
+  <!-- Background Badge Terakota Keramik Plered -->
+  <rect width="120" height="120" rx="28" fill="#9A3412"/>
+  
+  <!-- Simbol Kendi Air Plered (Monoline Putih) -->
+  <g transform="translate(24, 24) scale(3)" stroke="#FFFBEB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M12 2v2" />
+    <path d="M10 4h4" />
+    <path d="M9 7h6" />
+    <path d="M8 10c0 4.5 1.5 9 4 11 2.5-2 4-6.5 4-11a5 5 0 0 0-8 0Z" />
+  </g>
+</svg>

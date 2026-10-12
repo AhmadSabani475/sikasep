@@ -57,10 +57,10 @@ describe('Cashier Screen Fixes & Polish', () => {
     assert.ok(!content.includes('AIChatWidget'), 'Must not import AIChatWidget in layout');
   });
 
-  test('(4) QuickMenuGrid category tabs must have >= 48px touch targets', () => {
+  test('(4) QuickMenuGrid interactive controls must have >= 48px touch targets', () => {
     const content = fs.readFileSync(quickMenuPath, 'utf8');
 
-    assert.match(content, /min-h-\[(?:4[8-9]|[5-9]\d|\d{3})px\]/i, 'Category buttons must have >= 48px touch targets');
+    assert.match(content, /min-h-\[(?:4[8-9]|[5-9]\d|\d{3})px\]/i, 'Interactive controls must have >= 48px touch targets');
   });
 
   test('(5) Air Mineral must exist in mock-data.ts with realistic price (4000)', () => {
